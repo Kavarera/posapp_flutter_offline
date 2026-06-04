@@ -71,69 +71,84 @@ class _LoginPageState extends State<LoginPage> {
               const Text(
                 'Masuk ke Akun Anda',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 32),
-              
+
               // Username Field
               TextField(
+                style: TextStyle(color: Colors.white),
                 controller: _usernameController,
                 decoration: const InputDecoration(
-                  labelText: 'Username',
-                  prefixIcon: Icon(Icons.person_outline),
+                  hintText: 'Username',
+                  hintStyle: TextStyle(color: Colors.white),
+                  prefixIcon: Icon(Icons.person_outline, color: Colors.white),
+                  fillColor: AppColors.secondary,
+                  focusColor: Colors.white,
                 ),
                 textInputAction: TextInputAction.next,
+                cursorColor: Colors.white,
               ),
               const SizedBox(height: 16),
-              
+
               // Password Field
-              Obx(() => TextField(
-                    controller: _passwordController,
-                    obscureText: _authController.isObscureText.value,
-                    decoration: InputDecoration(
-                      labelText: 'Password / PIN',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _authController.isObscureText.value
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: _authController.togglePasswordVisibility,
+              Obx(
+                () => TextField(
+                  controller: _passwordController,
+                  obscureText: _authController.isObscureText.value,
+                  style: TextStyle(color: Colors.white),
+                  cursorColor: Colors.white,
+                  decoration: InputDecoration(
+                    hintText: 'Password / PIN',
+                    hintStyle: TextStyle(color: Colors.white),
+                    fillColor: AppColors.secondary,
+                    focusColor: Colors.white,
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: Colors.white,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _authController.isObscureText.value
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: Colors.white,
                       ),
+                      onPressed: _authController.togglePasswordVisibility,
                     ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _submit(),
-                  )),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                ),
+              ),
               const SizedBox(height: 32),
-              
+
               // Login Button
-              Obx(() => ElevatedButton(
-                    onPressed: _authController.isLoading.value ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                    ),
-                    child: _authController.isLoading.value
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: AppColors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'MASUK',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                            ),
+              Obx(
+                () => ElevatedButton(
+                  onPressed: _authController.isLoading.value ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                  ),
+                  child: _authController.isLoading.value
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: AppColors.white,
+                            strokeWidth: 2,
                           ),
-                  )),
+                        )
+                      : const Text(
+                          'MASUK',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                ),
+              ),
             ],
           ),
         ),
