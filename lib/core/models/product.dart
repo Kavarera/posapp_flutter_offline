@@ -1,11 +1,9 @@
-import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
-
 class Product {
   final int? id;
   final int? categoryId;
+  final int? unitId;
   final String name;
   final String barcode;
-  final String baseUnit;
   final double buyPrice;
   final double buyPricePpn;
   final double sellPrice;
@@ -14,15 +12,18 @@ class Product {
   final String? createdAt;
   final String? updatedAt;
   
-  // To hold joined/nested units if fetched
-  final List<ProductUnit> units;
+  // Joined properties
+  final String? categoryName;
+  final String? unitName;
+  List<int> supplierIds;
+  final String? supplierNames; // For easy UI display
 
   Product({
     this.id,
     this.categoryId,
+    this.unitId,
     required this.name,
     required this.barcode,
-    required this.baseUnit,
     this.buyPrice = 0,
     this.buyPricePpn = 0,
     this.sellPrice = 0,
@@ -30,16 +31,19 @@ class Product {
     this.stock = 0,
     this.createdAt,
     this.updatedAt,
-    this.units = const [],
+    this.categoryName,
+    this.unitName,
+    this.supplierIds = const [],
+    this.supplierNames,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as int?,
       categoryId: json['category_id'] as int?,
+      unitId: json['unit_id'] as int?,
       name: json['name'] as String,
       barcode: json['barcode'] as String,
-      baseUnit: json['base_unit'] as String,
       buyPrice: (json['buy_price'] as num?)?.toDouble() ?? 0,
       buyPricePpn: (json['buy_price_ppn'] as num?)?.toDouble() ?? 0,
       sellPrice: (json['sell_price'] as num?)?.toDouble() ?? 0,
@@ -47,16 +51,18 @@ class Product {
       stock: json['stock'] as int? ?? 0,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
-      // We manually populate 'units' later in the DB query logic, as SQLite doesn't natively return nested JSON
+      categoryName: json['category_name'] as String?,
+      unitName: json['unit_name'] as String?,
+      supplierNames: json['supplier_names'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'category_id': categoryId,
+      'unit_id': unitId,
       'name': name,
       'barcode': barcode,
-      'base_unit': baseUnit,
       'buy_price': buyPrice,
       'buy_price_ppn': buyPricePpn,
       'sell_price': sellPrice,

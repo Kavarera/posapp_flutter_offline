@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/master_supplier/supplier_controller.dart';
 import 'package:posapp_w6zxit6s/core/models/supplier.dart';
+import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
+import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 
 class SupplierPage extends StatefulWidget {
   const SupplierPage({super.key});
@@ -16,77 +18,77 @@ class _SupplierPageState extends State<SupplierPage> {
 
   void _showFormDialog({Supplier? supplier}) {
     final nameController = TextEditingController(text: supplier?.name ?? '');
-    final contactController = TextEditingController(text: supplier?.contact ?? '');
+    final contactController = TextEditingController(
+      text: supplier?.contact ?? '',
+    );
     final npwpController = TextEditingController(text: supplier?.npwp ?? '');
-    final bankController = TextEditingController(text: supplier?.bankAccount ?? '');
-    final addressController = TextEditingController(text: supplier?.address ?? '');
+    final bankController = TextEditingController(
+      text: supplier?.bankAccount ?? '',
+    );
+    final addressController = TextEditingController(
+      text: supplier?.address ?? '',
+    );
 
     Get.dialog(
-      AlertDialog(
-        title: Text(supplier == null ? 'Tambah Supplier' : 'Ubah Supplier'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Nama Supplier *'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: contactController,
-                decoration: const InputDecoration(labelText: 'Kontak / Telepon'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: npwpController,
-                decoration: const InputDecoration(labelText: 'NPWP'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: bankController,
-                decoration: const InputDecoration(labelText: 'Rekening Bank'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(labelText: 'Alamat'),
-                maxLines: 3,
-              ),
-            ],
-          ),
+      CustomDialog(
+        title: supplier == null ? 'Tambah Supplier' : 'Ubah Supplier',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nama Supplier *'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: contactController,
+              decoration: const InputDecoration(labelText: 'Kontak / Telepon'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: npwpController,
+              decoration: const InputDecoration(labelText: 'NPWP'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: bankController,
+              decoration: const InputDecoration(labelText: 'Rekening Bank'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: addressController,
+              decoration: const InputDecoration(labelText: 'Alamat'),
+              maxLines: 3,
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.trim().isEmpty) {
-                Get.snackbar('Validasi', 'Nama Supplier wajib diisi!');
-                return;
-              }
-              
-              final newSupplier = Supplier(
-                id: supplier?.id,
-                name: nameController.text.trim(),
-                contact: contactController.text.trim(),
-                npwp: npwpController.text.trim(),
-                bankAccount: bankController.text.trim(),
-                address: addressController.text.trim(),
-              );
+        onCancel: () => Get.back(),
+        onConfirm: () {
+          if (nameController.text.trim().isEmpty) {
+            SnackbarHelper.show(
+              'Validasi',
+              'Nama Supplier wajib diisi!',
+              isError: true,
+            );
+            return;
+          }
 
-              if (supplier == null) {
-                _controller.addSupplier(newSupplier);
-              } else {
-                _controller.updateSupplier(newSupplier);
-              }
-              Get.back();
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
+          final newSupplier = Supplier(
+            id: supplier?.id,
+            name: nameController.text.trim(),
+            contact: contactController.text.trim(),
+            npwp: npwpController.text.trim(),
+            bankAccount: bankController.text.trim(),
+            address: addressController.text.trim(),
+          );
+
+          if (supplier == null) {
+            _controller.addSupplier(newSupplier);
+          } else {
+            _controller.updateSupplier(newSupplier);
+          }
+          Get.back();
+        },
       ),
     );
   }
@@ -123,53 +125,178 @@ class _SupplierPageState extends State<SupplierPage> {
                 return const Center(child: Text('Data supplier masih kosong.'));
               }
 
-              return Card(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('Nama')),
-                        DataColumn(label: Text('Kontak')),
-                        DataColumn(label: Text('Bank')),
-                        DataColumn(label: Text('Aksi')),
-                      ],
-                      rows: _controller.suppliers.map((sup) {
-                        return DataRow(cells: [
-                          DataCell(Text(sup.name)),
-                          DataCell(Text(sup.contact ?? '-')),
-                          DataCell(Text(sup.bankAccount ?? '-')),
-                          DataCell(Row(
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 350,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.35,
+                ),
+                itemCount: _controller.suppliers.length,
+                itemBuilder: (context, index) {
+                  final sup = _controller.suppliers[index];
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: AppColors.primary),
-                                onPressed: () => _showFormDialog(supplier: sup),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      sup.name.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      sup.npwp?.isNotEmpty == true
+                                          ? sup.npwp!
+                                          : '-',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: AppColors.error),
-                                onPressed: () {
-                                  Get.defaultDialog(
-                                    title: 'Hapus Supplier',
-                                    middleText: 'Apakah Anda yakin ingin menghapus ${sup.name}?',
-                                    textConfirm: 'Hapus',
-                                    textCancel: 'Batal',
-                                    confirmTextColor: AppColors.white,
-                                    buttonColor: AppColors.error,
-                                    onConfirm: () {
-                                      _controller.deleteSupplier(sup.id!);
-                                      Get.back();
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    onPressed: () =>
+                                        _showFormDialog(supplier: sup),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: AppColors.error,
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      Get.dialog(
+                                        CustomDialog(
+                                          title: 'Hapus Supplier',
+                                          content: Text(
+                                            'Apakah Anda yakin ingin menghapus ${sup.name}?',
+                                          ),
+                                          confirmText: 'Hapus',
+                                          isDestructive: true,
+                                          onCancel: () => Get.back(),
+                                          onConfirm: () {
+                                            _controller.deleteSupplier(sup.id!);
+                                            Get.back();
+                                          },
+                                        ),
+                                      );
                                     },
-                                  );
-                                },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
                               ),
                             ],
-                          )),
-                        ]);
-                      }).toList(),
+                          ),
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.phone,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                sup.contact?.isNotEmpty == true
+                                    ? sup.contact!
+                                    : '-',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.account_balance,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  sup.bankAccount?.isNotEmpty == true
+                                      ? sup.bankAccount!
+                                      : '-',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    sup.address?.isNotEmpty == true
+                                        ? sup.address!
+                                        : '-',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               );
             }),
           ),

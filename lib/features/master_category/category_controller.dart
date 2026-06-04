@@ -21,7 +21,12 @@ class CategoryController extends GetxController {
     try {
       isLoading.value = true;
       Database db = await _dbHelper.database;
-      final List<Map<String, dynamic>> maps = await db.query('categories');
+      final List<Map<String, dynamic>> maps = await db.rawQuery('''
+        SELECT c.*, COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON c.id = p.category_id
+        GROUP BY c.id
+      ''');
       categories.value = maps.map((e) => Category.fromJson(e)).toList();
     } catch (e) {
       _logger.e("Error fetching categories", error: e);

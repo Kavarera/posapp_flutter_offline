@@ -37,16 +37,30 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       ),
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
-    _logger.i("Creating database tables for Phase 1");
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    _logger.i("Upgrading database from v$oldVersion to v$newVersion. Dropping all tables and recreating.");
+    await db.execute('DROP TABLE IF EXISTS product_suppliers');
+    await db.execute('DROP TABLE IF EXISTS product_units'); // Old table
+    await db.execute('DROP TABLE IF EXISTS products');
+    await db.execute('DROP TABLE IF EXISTS units');
+    await db.execute('DROP TABLE IF EXISTS categories');
+    await db.execute('DROP TABLE IF EXISTS suppliers');
+    await db.execute('DROP TABLE IF EXISTS customers');
+    await db.execute('DROP TABLE IF EXISTS users');
+    await _onCreate(db, newVersion);
+  }
 
-    // 1. Users table (Admin/Kasir)
+  Future<void> _onCreate(Database db, int version) async {
+    _logger.i("Creating database tables for Phase 1 (v2)");
+
+    // 1. Users table
     await db.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,14 +91,26 @@ class DatabaseHelper {
       )
     ''');
 
-    // 4. Products table
+    // 4. Units table (Master Satuan)
+    await db.execute('''
+      CREATE TABLE units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        has_derived INTEGER NOT NULL DEFAULT 0,
+        derived_unit_id INTEGER,
+        multiplier_to_derived INTEGER,
+        FOREIGN KEY (derived_unit_id) REFERENCES units(id) ON DELETE RESTRICT
+      )
+    ''');
+
+    // 5. Products table
     await db.execute('''
       CREATE TABLE products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category_id INTEGER,
+        unit_id INTEGER,
         name TEXT NOT NULL,
         barcode TEXT UNIQUE NOT NULL,
-        base_unit TEXT NOT NULL,
         buy_price REAL NOT NULL DEFAULT 0,
         buy_price_ppn REAL NOT NULL DEFAULT 0,
         sell_price REAL NOT NULL DEFAULT 0,
@@ -92,22 +118,23 @@ class DatabaseHelper {
         stock INTEGER NOT NULL DEFAULT 0,
         created_at TEXT,
         updated_at TEXT,
-        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
+        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL,
+        FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE RESTRICT
       )
     ''');
 
-    // 5. Product Units table (For IB/OB multi-unit conversion)
+    // 6. Product Suppliers Junction Table (Many-to-Many)
     await db.execute('''
-      CREATE TABLE product_units (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id INTEGER NOT NULL,
-        unit_name TEXT NOT NULL,
-        multiplier INTEGER NOT NULL,
-        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+      CREATE TABLE product_suppliers (
+        product_id INTEGER,
+        supplier_id INTEGER,
+        PRIMARY KEY (product_id, supplier_id),
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE CASCADE
       )
     ''');
 
-    // 6. Customers table
+    // 7. Customers table
     await db.execute('''
       CREATE TABLE customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,12 +142,14 @@ class DatabaseHelper {
         address TEXT,
         phone TEXT,
         status TEXT NOT NULL DEFAULT 'Aktif',
-        receivable_balance REAL NOT NULL DEFAULT 0
+        receivable_balance REAL NOT NULL DEFAULT 0,
+        created_at TEXT
       )
     ''');
 
-    // Seed the default admin
+    // Seed default admin and default unit "Pcs"
     await _seedAdmin(db);
+    await _seedDefaultData(db);
   }
 
   Future<void> _seedAdmin(Database db) async {
@@ -137,5 +166,14 @@ class DatabaseHelper {
     });
     
     _logger.i("Default admin seeded successfully.");
+  }
+
+  Future<void> _seedDefaultData(Database db) async {
+    // Generate default unit "Pcs" per FRD requirement
+    await db.insert('units', {
+      'name': 'Pcs',
+      'has_derived': 0,
+    });
+    _logger.i("Default unit 'Pcs' seeded successfully.");
   }
 }

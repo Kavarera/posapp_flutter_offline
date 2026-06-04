@@ -6,21 +6,29 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 import 'package:posapp_w6zxit6s/core/database/database_helper.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
+import 'package:posapp_w6zxit6s/core/models/category.dart' as category_model;
+import 'package:posapp_w6zxit6s/core/models/unit.dart';
+import 'package:posapp_w6zxit6s/core/models/supplier.dart';
 import 'package:posapp_w6zxit6s/core/utils/csv_helper.dart';
+import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 
 class ProductController extends GetxController {
   final _dbHelper = DatabaseHelper();
   final _logger = Logger();
 
   var products = <Product>[].obs;
+  var categories = <category_model.Category>[].obs;
+  var units = <Unit>[].obs;
+  var suppliers = <Supplier>[].obs;
+
   var isLoading = false.obs;
   var isImporting = false.obs;
-  
+
   // Pagination
   final int limit = 50;
   var offset = 0;
   var hasMoreData = true.obs;
-  
+
   // Search
   var searchQuery = ''.obs;
   Timer? _debounce;
@@ -28,6 +36,7 @@ class ProductController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    fetchDependencies();
     fetchProducts();
   }
 
@@ -35,6 +44,25 @@ class ProductController extends GetxController {
   void onClose() {
     _debounce?.cancel();
     super.onClose();
+  }
+
+  Future<void> fetchDependencies() async {
+    try {
+      Database db = await _dbHelper.database;
+
+      final catMaps = await db.query('categories');
+      categories.value = catMaps
+          .map((e) => category_model.Category.fromJson(e))
+          .toList();
+
+      final unitMaps = await db.query('units');
+      units.value = unitMaps.map((e) => Unit.fromJson(e)).toList();
+
+      final supMaps = await db.query('suppliers');
+      suppliers.value = supMaps.map((e) => Supplier.fromJson(e)).toList();
+    } catch (e) {
+      _logger.e("Error fetching dependencies", error: e);
+    }
   }
 
   void onSearchChanged(String query) {
@@ -54,37 +82,52 @@ class ProductController extends GetxController {
     try {
       isLoading.value = true;
       Database db = await _dbHelper.database;
-      
-      String whereClause = '';
-      List<dynamic> whereArgs = [];
-      
+
+      String searchCondition = '';
       if (searchQuery.value.isNotEmpty) {
-        whereClause = 'name LIKE ? OR barcode LIKE ?';
-        whereArgs = ['%${searchQuery.value}%', '%${searchQuery.value}%'];
+        searchCondition =
+            'WHERE p.name LIKE "%${searchQuery.value}%" OR p.barcode LIKE "%${searchQuery.value}%"';
       }
 
-      final List<Map<String, dynamic>> maps = await db.query(
-        'products',
-        where: whereClause.isEmpty ? null : whereClause,
-        whereArgs: whereArgs.isEmpty ? null : whereArgs,
-        limit: limit,
-        offset: offset,
-      );
+      final List<Map<String, dynamic>> maps = await db.rawQuery('''
+        SELECT p.*, 
+               c.name as category_name, 
+               u.name as unit_name,
+               GROUP_CONCAT(s.name, ', ') as supplier_names
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN units u ON p.unit_id = u.id
+        LEFT JOIN product_suppliers ps ON p.id = ps.product_id
+        LEFT JOIN suppliers s ON ps.supplier_id = s.id
+        $searchCondition
+        GROUP BY p.id
+        LIMIT $limit OFFSET $offset
+      ''');
 
       if (maps.length < limit) {
         hasMoreData.value = false;
       }
 
       var newProducts = maps.map((e) => Product.fromJson(e)).toList();
-      
+
+      // Fetch exact supplier IDs for each product to make editing easier
+      for (var p in newProducts) {
+        final psMaps = await db.query(
+          'product_suppliers',
+          columns: ['supplier_id'],
+          where: 'product_id = ?',
+          whereArgs: [p.id],
+        );
+        p.supplierIds = psMaps.map((e) => e['supplier_id'] as int).toList();
+      }
+
       if (loadMore) {
         products.addAll(newProducts);
       } else {
         products.value = newProducts;
       }
-      
+
       offset += limit;
-      
     } catch (e) {
       _logger.e("Error fetching products", error: e);
       Get.snackbar('Error', 'Gagal memuat barang');
@@ -96,7 +139,20 @@ class ProductController extends GetxController {
   Future<void> addProduct(Product product) async {
     try {
       Database db = await _dbHelper.database;
-      await db.insert('products', product.toJson());
+
+      await db.transaction((txn) async {
+        final newJson = product.toJson();
+        newJson['created_at'] = DateTime.now().toIso8601String();
+        int productId = await txn.insert('products', newJson);
+
+        for (int supId in product.supplierIds) {
+          await txn.insert('product_suppliers', {
+            'product_id': productId,
+            'supplier_id': supId,
+          });
+        }
+      });
+
       _logger.i("Product ${product.name} added");
       offset = 0;
       hasMoreData.value = true;
@@ -104,14 +160,41 @@ class ProductController extends GetxController {
       await fetchProducts();
     } catch (e) {
       _logger.e("Error adding product", error: e);
-      Get.snackbar('Error', 'Gagal menambahkan barang (Barcode mungkin duplikat).');
+      Get.snackbar(
+        'Error',
+        'Gagal menambahkan barang (Barcode mungkin duplikat).',
+      );
     }
   }
 
   Future<void> updateProduct(Product product) async {
     try {
       Database db = await _dbHelper.database;
-      await db.update('products', product.toJson(), where: 'id = ?', whereArgs: [product.id]);
+
+      await db.transaction((txn) async {
+        final newJson = product.toJson();
+        newJson['updated_at'] = DateTime.now().toIso8601String();
+        await txn.update(
+          'products',
+          newJson,
+          where: 'id = ?',
+          whereArgs: [product.id],
+        );
+
+        // Update product_suppliers: delete all existing, insert new
+        await txn.delete(
+          'product_suppliers',
+          where: 'product_id = ?',
+          whereArgs: [product.id],
+        );
+        for (int supId in product.supplierIds) {
+          await txn.insert('product_suppliers', {
+            'product_id': product.id,
+            'supplier_id': supId,
+          });
+        }
+      });
+
       _logger.i("Product ${product.id} updated");
       offset = 0;
       hasMoreData.value = true;
@@ -140,10 +223,14 @@ class ProductController extends GetxController {
       String csv = CsvHelper.generateCsvTemplate();
       File file = File(path);
       await file.writeAsString(csv);
-      Get.snackbar('Sukses', 'Template CSV berhasil diekspor ke $path');
+      SnackbarHelper.show(
+        'Sukses',
+        'Template CSV berhasil diekspor ke $path',
+        isError: false,
+      );
     } catch (e) {
       _logger.e("Export CSV failed", error: e);
-      Get.snackbar('Error', 'Gagal mengekspor CSV.');
+      SnackbarHelper.show('Error', 'Gagal mengekspor CSV.', isError: true);
     }
   }
 
@@ -152,59 +239,79 @@ class ProductController extends GetxController {
       isImporting.value = true;
       File file = File(filePath);
       String csvString = await file.readAsString();
-      
+
       // Parse CSV in isolate
-      List<Map<String, dynamic>> parsedData = await compute(CsvHelper.parseCsvData, csvString);
-      
+      List<Map<String, dynamic>> parsedData = await compute(
+        CsvHelper.parseCsvData,
+        csvString,
+      );
+
       if (parsedData.isEmpty) {
         throw Exception("File CSV kosong atau format tidak valid.");
       }
 
       Database db = await _dbHelper.database;
-      
+
       // Upsert logic inside a transaction
       await db.transaction((txn) async {
         for (var row in parsedData) {
           String barcode = row['barcode'].toString();
-          
-          List<Map<String, Object?>> existing = await txn.query('products', where: 'barcode = ?', whereArgs: [barcode]);
-          
+
+          List<Map<String, Object?>> existing = await txn.query(
+            'products',
+            where: 'barcode = ?',
+            whereArgs: [barcode],
+          );
+
           if (existing.isNotEmpty) {
             // Update
-            await txn.update('products', {
-              'name': row['name'],
-              'buy_price': double.tryParse(row['buy_price'].toString()) ?? 0.0,
-              'buy_price_ppn': double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
-              'sell_price': double.tryParse(row['sell_price'].toString()) ?? 0.0,
-              'stock': int.tryParse(row['stock'].toString()) ?? 0,
-            }, where: 'barcode = ?', whereArgs: [barcode]);
+            await txn.update(
+              'products',
+              {
+                'name': row['name'],
+                'buy_price':
+                    double.tryParse(row['buy_price'].toString()) ?? 0.0,
+                'buy_price_ppn':
+                    double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
+                'sell_price':
+                    double.tryParse(row['sell_price'].toString()) ?? 0.0,
+                'stock': int.tryParse(row['stock'].toString()) ?? 0,
+              },
+              where: 'barcode = ?',
+              whereArgs: [barcode],
+            );
           } else {
             // Insert
             await txn.insert('products', {
               'name': row['name'],
               'barcode': barcode,
-              'base_unit': row['base_unit']?.toString() ?? 'Pcs',
+              // 'base_unit': row['base_unit']?.toString() ?? 'Pcs', // Base unit text removed in Phase 1 v2
               'buy_price': double.tryParse(row['buy_price'].toString()) ?? 0.0,
-              'buy_price_ppn': double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
-              'sell_price': double.tryParse(row['sell_price'].toString()) ?? 0.0,
+              'buy_price_ppn':
+                  double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
+              'sell_price':
+                  double.tryParse(row['sell_price'].toString()) ?? 0.0,
               'stock': int.tryParse(row['stock'].toString()) ?? 0,
               'min_stock': int.tryParse(row['min_stock'].toString()) ?? 0,
             });
           }
         }
       });
-      
+
       _logger.i("CSV Import successful");
-      Get.snackbar('Sukses', 'Data barang berhasil diimpor.');
-      
+      SnackbarHelper.show(
+        'Sukses',
+        'Data barang berhasil diimpor.',
+        isError: false,
+      );
+
       offset = 0;
       products.clear();
       hasMoreData.value = true;
       await fetchProducts();
-
     } catch (e) {
       _logger.e("CSV Import failed", error: e);
-      Get.snackbar('Error', 'Gagal mengimpor CSV: $e');
+      SnackbarHelper.show('Error', 'Gagal mengimpor CSV: $e', isError: true);
     } finally {
       isImporting.value = false;
     }

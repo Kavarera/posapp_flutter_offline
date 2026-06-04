@@ -2,9 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:posapp_w6zxit6s/core/models/category.dart';
+import 'package:posapp_w6zxit6s/core/models/unit.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/master_product/product_controller.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
+import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
+import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key});
@@ -39,74 +43,207 @@ class _ProductPageState extends State<ProductPage> {
     final barcodeController = TextEditingController(
       text: product?.barcode ?? '',
     );
-    final baseUnitController = TextEditingController(
-      text: product?.baseUnit ?? 'Pcs',
-    );
     final buyController = TextEditingController(
       text: product?.buyPrice.toString() ?? '0',
     );
     final sellController = TextEditingController(
       text: product?.sellPrice.toString() ?? '0',
     );
+    final minStockController = TextEditingController(
+      text: product?.minStock.toString() ?? '0',
+    );
+
+    int? selectedCategoryId = product?.categoryId;
+    int? selectedUnitId = product?.unitId;
+    List<int> selectedSuppliers = List<int>.from(product?.supplierIds ?? []);
 
     Get.dialog(
-      AlertDialog(
-        title: Text(product == null ? 'Tambah Barang' : 'Ubah Barang'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Nama Barang *'),
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          return CustomDialog(
+            title: product == null ? 'Tambah Barang' : 'Ubah Barang',
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: barcodeController,
-                decoration: const InputDecoration(labelText: 'Barcode *'),
-                enabled:
-                    product ==
-                    null, // Prevent editing barcode for simplicity in Phase 1
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: baseUnitController,
-                decoration: const InputDecoration(labelText: 'Satuan Dasar'),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: buyController,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
                       decoration: const InputDecoration(
-                        labelText: 'Harga Beli',
+                        labelText: 'Nama Barang *',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: barcodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Barcode/SKU *',
+                      ),
+                      enabled: product == null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      value: selectedCategoryId,
+                      decoration: const InputDecoration(labelText: 'Kategori'),
+                      items: [
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('Tidak ada'),
+                        ),
+                        ..._controller.categories.map(
+                          (Category c) => DropdownMenuItem<int>(
+                            value: c.id,
+                            child: Text(c.name),
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) =>
+                          setDialogState(() => selectedCategoryId = val),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: selectedUnitId,
+                            decoration: const InputDecoration(
+                              labelText: 'Satuan Barang *',
+                            ),
+                            items: _controller.units
+                                .map(
+                                  (Unit u) => DropdownMenuItem<int>(
+                                    value: u.id,
+                                    child: Text(u.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) =>
+                                setDialogState(() => selectedUnitId = val),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Tooltip(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.symmetric(horizontal: 32),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          textStyle: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                          message: 'Info Satuan Barang:\n'
+                              '• Digunakan sebagai satuan dasar perhitungan.\n'
+                              '• Stok dan penjualan bergantung pada satuan ini.\n'
+                              '• Batas stok minimum menggunakan satuan ini.',
+                          triggerMode: TooltipTriggerMode.tap,
+                          child: const Icon(
+                            Icons.info_outline,
+                            size: 24,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: buyController,
+                            decoration: const InputDecoration(
+                              labelText: 'Harga Beli (Satuan Barang)',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: sellController,
+                            decoration: const InputDecoration(
+                              labelText: 'Harga Jual',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: minStockController,
+                      decoration: const InputDecoration(
+                        labelText: 'Batas Stok Minimum',
                       ),
                       keyboardType: TextInputType.number,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: sellController,
-                      decoration: const InputDecoration(
-                        labelText: 'Harga Jual',
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Pilih Supplier (Bisa lebih dari satu)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
                       ),
-                      keyboardType: TextInputType.number,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: _controller.suppliers.map((sup) {
+                        final isSelected = selectedSuppliers.contains(sup.id);
+                        return FilterChip(
+                          label: Text(sup.name),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary.withOpacity(0.2),
+                          checkmarkColor: AppColors.primary,
+                          onSelected: (bool selected) {
+                            setDialogState(() {
+                              if (selected) {
+                                selectedSuppliers.add(sup.id!);
+                              } else {
+                                selectedSuppliers.remove(sup.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
+            ),
+            onCancel: () => Get.back(),
+            onConfirm: () {
               if (nameController.text.trim().isEmpty ||
                   barcodeController.text.trim().isEmpty) {
-                Get.snackbar('Validasi', 'Nama dan Barcode wajib diisi!');
+                SnackbarHelper.show(
+                  'Validasi',
+                  'Nama dan Barcode wajib diisi!',
+                  isError: true,
+                );
+                return;
+              }
+              if (selectedUnitId == null) {
+                SnackbarHelper.show(
+                  'Validasi',
+                  'Satuan Barang wajib dipilih!',
+                  isError: true,
+                );
                 return;
               }
 
@@ -114,9 +251,13 @@ class _ProductPageState extends State<ProductPage> {
                 id: product?.id,
                 name: nameController.text.trim(),
                 barcode: barcodeController.text.trim(),
-                baseUnit: baseUnitController.text.trim(),
+                categoryId: selectedCategoryId,
+                unitId: selectedUnitId,
                 buyPrice: double.tryParse(buyController.text) ?? 0,
                 sellPrice: double.tryParse(sellController.text) ?? 0,
+                minStock: int.tryParse(minStockController.text) ?? 0,
+                stock: product?.stock ?? 0,
+                supplierIds: selectedSuppliers,
               );
 
               if (product == null) {
@@ -126,9 +267,8 @@ class _ProductPageState extends State<ProductPage> {
               }
               Get.back();
             },
-            child: const Text('Simpan'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -136,8 +276,8 @@ class _ProductPageState extends State<ProductPage> {
   void _showImportDialog() {
     final pathController = TextEditingController();
     Get.dialog(
-      AlertDialog(
-        title: const Text('Import CSV'),
+      CustomDialog(
+        title: 'Import CSV',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -149,18 +289,14 @@ class _ProductPageState extends State<ProductPage> {
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              if (pathController.text.isNotEmpty) {
-                _controller.importCsv(pathController.text);
-                Get.back();
-              }
-            },
-            child: const Text('Import'),
-          ),
-        ],
+        confirmText: 'Import',
+        onCancel: () => Get.back(),
+        onConfirm: () {
+          if (pathController.text.isNotEmpty) {
+            _controller.importCsv(pathController.text);
+            Get.back();
+          }
+        },
       ),
     );
   }
@@ -191,7 +327,7 @@ class _ProductPageState extends State<ProductPage> {
                     icon: const Icon(Icons.download, color: Colors.black),
                     label: const Text(
                       'Template CSV',
-                      style: const TextStyle(color: Colors.black),
+                      style: TextStyle(color: Colors.black),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -205,7 +341,17 @@ class _ProductPageState extends State<ProductPage> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: () => _showFormDialog(),
+                    onPressed: () {
+                      if (_controller.units.isEmpty) {
+                        SnackbarHelper.show(
+                          'Perhatian',
+                          'Harap isi Master Satuan terlebih dahulu sebelum menambah barang.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      _showFormDialog();
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Tambah Data'),
                   ),
@@ -271,12 +417,66 @@ class _ProductPageState extends State<ProductPage> {
 
                     final p = _controller.products[index];
                     return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       title: Text(
                         p.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                      subtitle: Text(
-                        "Barcode: ${p.barcode} | Harga: Rp ${p.sellPrice} | Stok: ${p.stock} ${p.baseUnit}",
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                "SKU: ${p.barcode}",
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  p.categoryName ?? 'Tanpa Kategori',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Harga: Rp ${p.sellPrice} | Stok: ${p.stock} ${p.unitName ?? '-'} (Min: ${p.minStock})",
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          if (p.supplierNames != null &&
+                              p.supplierNames!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              "Supplier: ${p.supplierNames}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -294,7 +494,21 @@ class _ProductPageState extends State<ProductPage> {
                               color: AppColors.error,
                             ),
                             onPressed: () {
-                              _controller.deleteProduct(p.id!);
+                              Get.dialog(
+                                CustomDialog(
+                                  title: 'Hapus Barang',
+                                  content: Text(
+                                    'Apakah Anda yakin ingin menghapus ${p.name}?',
+                                  ),
+                                  confirmText: 'Hapus',
+                                  isDestructive: true,
+                                  onCancel: () => Get.back(),
+                                  onConfirm: () {
+                                    _controller.deleteProduct(p.id!);
+                                    Get.back();
+                                  },
+                                ),
+                              );
                             },
                           ),
                         ],

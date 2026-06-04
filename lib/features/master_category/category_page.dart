@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/master_category/category_controller.dart';
 import 'package:posapp_w6zxit6s/core/models/category.dart';
+import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
 
 class CategoryPage extends StatefulWidget {
   const CategoryPage({super.key});
@@ -18,31 +19,23 @@ class _CategoryPageState extends State<CategoryPage> {
     final nameController = TextEditingController(text: category?.name ?? '');
 
     Get.dialog(
-      AlertDialog(
-        title: Text(category == null ? 'Tambah Kategori' : 'Ubah Kategori'),
+      CustomDialog(
+        title: category == null ? 'Tambah Kategori' : 'Ubah Kategori',
         content: TextField(
           controller: nameController,
           decoration: const InputDecoration(labelText: 'Nama Kategori'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.trim().isNotEmpty) {
-                if (category == null) {
-                  _controller.addCategory(nameController.text.trim());
-                } else {
-                  _controller.updateCategory(category.id!, nameController.text.trim());
-                }
-                Get.back();
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
+        onCancel: () => Get.back(),
+        onConfirm: () {
+          if (nameController.text.trim().isNotEmpty) {
+            if (category == null) {
+              _controller.addCategory(nameController.text.trim());
+            } else {
+              _controller.updateCategory(category.id!, nameController.text.trim());
+            }
+            Get.back();
+          }
+        },
       ),
     );
   }
@@ -79,43 +72,91 @@ class _CategoryPageState extends State<CategoryPage> {
                 return const Center(child: Text('Data kategori masih kosong.'));
               }
 
-              return Card(
-                child: ListView.separated(
-                  itemCount: _controller.categories.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final cat = _controller.categories[index];
-                    return ListTile(
-                      title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+              return GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 250,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.5,
+                ),
+                itemCount: _controller.categories.length,
+                itemBuilder: (context, index) {
+                  final cat = _controller.categories[index];
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: AppColors.primary),
-                            onPressed: () => _showFormDialog(category: cat),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  cat.name,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: AppColors.primary, size: 20),
+                                    onPressed: () => _showFormDialog(category: cat),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: AppColors.error, size: 20),
+                                    onPressed: () {
+                                      Get.dialog(
+                                        CustomDialog(
+                                          title: 'Hapus Kategori',
+                                          content: const Text('Apakah Anda yakin ingin menghapus kategori ini?'),
+                                          confirmText: 'Hapus',
+                                          isDestructive: true,
+                                          onCancel: () => Get.back(),
+                                          onConfirm: () {
+                                            _controller.deleteCategory(cat.id!);
+                                            Get.back();
+                                          },
+                                        ),
+                                      );
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: AppColors.error),
-                            onPressed: () {
-                              Get.defaultDialog(
-                                title: 'Hapus Kategori',
-                                middleText: 'Apakah Anda yakin ingin menghapus kategori ini?',
-                                textConfirm: 'Hapus',
-                                textCancel: 'Batal',
-                                confirmTextColor: AppColors.white,
-                                buttonColor: AppColors.error,
-                                onConfirm: () {
-                                  _controller.deleteCategory(cat.id!);
-                                  Get.back();
-                                },
-                              );
-                            },
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.background.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.primary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${cat.productCount} Barang',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               );
             }),
           ),
