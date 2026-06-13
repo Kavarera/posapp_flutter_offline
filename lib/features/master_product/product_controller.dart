@@ -9,6 +9,7 @@ import 'package:posapp_w6zxit6s/core/models/product.dart';
 import 'package:posapp_w6zxit6s/core/models/category.dart' as category_model;
 import 'package:posapp_w6zxit6s/core/models/unit.dart';
 import 'package:posapp_w6zxit6s/core/models/supplier.dart';
+import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
 import 'package:posapp_w6zxit6s/core/utils/csv_helper.dart';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 
@@ -119,6 +120,20 @@ class ProductController extends GetxController {
           whereArgs: [p.id],
         );
         p.supplierIds = psMaps.map((e) => e['supplier_id'] as int).toList();
+
+        final puMaps = await db.rawQuery(
+          '''
+          SELECT pu.*, 
+                 u1.name as unit_name, 
+                 u2.name as parent_unit_name
+          FROM product_units pu
+          LEFT JOIN units u1 ON pu.unit_id = u1.id
+          LEFT JOIN units u2 ON pu.parent_unit_id = u2.id
+          WHERE pu.product_id = ?
+        ''',
+          [p.id],
+        );
+        p.productUnits = puMaps.map((e) => ProductUnit.fromJson(e)).toList();
       }
 
       if (loadMore) {
@@ -149,6 +164,17 @@ class ProductController extends GetxController {
           await txn.insert('product_suppliers', {
             'product_id': productId,
             'supplier_id': supId,
+          });
+        }
+
+        for (var pu in product.productUnits) {
+          await txn.insert('product_units', {
+            'product_id': productId,
+            'unit_id': pu.unitId,
+            'is_base': pu.isBase ? 1 : 0,
+            'parent_unit_id': pu.parentUnitId,
+            'multiplier_to_parent': pu.multiplierToParent,
+            'multiplier_to_base': pu.multiplierToBase,
           });
         }
       });
@@ -191,6 +217,22 @@ class ProductController extends GetxController {
           await txn.insert('product_suppliers', {
             'product_id': product.id,
             'supplier_id': supId,
+          });
+        }
+
+        await txn.delete(
+          'product_units',
+          where: 'product_id = ?',
+          whereArgs: [product.id],
+        );
+        for (var pu in product.productUnits) {
+          await txn.insert('product_units', {
+            'product_id': product.id,
+            'unit_id': pu.unitId,
+            'is_base': pu.isBase ? 1 : 0,
+            'parent_unit_id': pu.parentUnitId,
+            'multiplier_to_parent': pu.multiplierToParent,
+            'multiplier_to_base': pu.multiplierToBase,
           });
         }
       });
@@ -269,6 +311,8 @@ class ProductController extends GetxController {
               'products',
               {
                 'name': row['name'],
+                'category_id': int.tryParse(row['category_id']?.toString() ?? ''),
+                'unit_id': int.tryParse(row['unit_id']?.toString() ?? '') ?? 1,
                 'buy_price':
                     double.tryParse(row['buy_price'].toString()) ?? 0.0,
                 'buy_price_ppn':
@@ -280,12 +324,37 @@ class ProductController extends GetxController {
               where: 'barcode = ?',
               whereArgs: [barcode],
             );
+            
+            // Note: Since base unit might change, we ideally should update product_units.
+            // But to keep it simple and safe for CSV imports, we ensure base unit exists
+            int productId = existing.first['id'] as int;
+            int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
+            
+            List<Map<String, Object?>> existingUnits = await txn.query(
+              'product_units',
+              where: 'product_id = ? AND is_base = 1',
+              whereArgs: [productId],
+            );
+            if (existingUnits.isEmpty) {
+               await txn.insert('product_units', {
+                  'product_id': productId,
+                  'unit_id': unitId,
+                  'is_base': 1,
+                  'multiplier_to_base': 1,
+               });
+            } else {
+               await txn.update('product_units', {
+                  'unit_id': unitId,
+               }, where: 'product_id = ? AND is_base = 1', whereArgs: [productId]);
+            }
           } else {
             // Insert
-            await txn.insert('products', {
+            int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
+            int productId = await txn.insert('products', {
               'name': row['name'],
               'barcode': barcode,
-              // 'base_unit': row['base_unit']?.toString() ?? 'Pcs', // Base unit text removed in Phase 1 v2
+              'category_id': int.tryParse(row['category_id']?.toString() ?? ''),
+              'unit_id': unitId,
               'buy_price': double.tryParse(row['buy_price'].toString()) ?? 0.0,
               'buy_price_ppn':
                   double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
@@ -293,6 +362,14 @@ class ProductController extends GetxController {
                   double.tryParse(row['sell_price'].toString()) ?? 0.0,
               'stock': int.tryParse(row['stock'].toString()) ?? 0,
               'min_stock': int.tryParse(row['min_stock'].toString()) ?? 0,
+            });
+            
+            // Insert base unit
+            await txn.insert('product_units', {
+                'product_id': productId,
+                'unit_id': unitId,
+                'is_base': 1,
+                'multiplier_to_base': 1,
             });
           }
         }

@@ -5,6 +5,7 @@ class Supplier {
   final String? npwp;
   final String? bankAccount;
   final String? address;
+  final double debtBalance;
 
   Supplier({
     this.id,
@@ -13,6 +14,7 @@ class Supplier {
     this.npwp,
     this.bankAccount,
     this.address,
+    this.debtBalance = 0,
   });
 
   factory Supplier.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Supplier {
       npwp: json['npwp'] as String?,
       bankAccount: json['bank_account'] as String?,
       address: json['address'] as String?,
+      debtBalance: (json['debt_balance'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -33,6 +36,7 @@ class Supplier {
       'npwp': npwp,
       'bank_account': bankAccount,
       'address': address,
+      'debt_balance': debtBalance,
     };
     if (id != null) {
       data['id'] = id;

@@ -7,8 +7,18 @@ import 'package:posapp_w6zxit6s/core/models/unit.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/master_product/product_controller.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
+import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
 import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
+
+class _TempProductUnit {
+  int? unitId;
+  int? parentUnitId;
+  TextEditingController multiplierController;
+
+  _TempProductUnit({this.unitId, this.parentUnitId, String multiplier = ''})
+    : multiplierController = TextEditingController(text: multiplier);
+}
 
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key});
@@ -54,8 +64,24 @@ class _ProductPageState extends State<ProductPage> {
     );
 
     int? selectedCategoryId = product?.categoryId;
-    int? selectedUnitId = product?.unitId;
+    int? selectedUnitId = product?.unitId; // Base Unit
     List<int> selectedSuppliers = List<int>.from(product?.supplierIds ?? []);
+
+    // Dynamic derived units
+    List<_TempProductUnit> tempDerivedUnits = [];
+    if (product != null && product.productUnits.isNotEmpty) {
+      for (var pu in product.productUnits) {
+        if (!pu.isBase) {
+          tempDerivedUnits.add(
+            _TempProductUnit(
+              unitId: pu.unitId,
+              parentUnitId: pu.parentUnitId,
+              multiplier: pu.multiplierToParent?.toString() ?? '',
+            ),
+          );
+        }
+      }
+    }
 
     Get.dialog(
       StatefulBuilder(
@@ -64,7 +90,8 @@ class _ProductPageState extends State<ProductPage> {
             title: product == null ? 'Tambah Barang' : 'Ubah Barang',
             content: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+                maxWidth: 600,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -95,7 +122,7 @@ class _ProductPageState extends State<ProductPage> {
                           child: Text('Tidak ada'),
                         ),
                         ..._controller.categories.map(
-                          (Category c) => DropdownMenuItem<int>(
+                          (c) => DropdownMenuItem<int>(
                             value: c.id,
                             child: Text(c.name),
                           ),
@@ -112,11 +139,11 @@ class _ProductPageState extends State<ProductPage> {
                           child: DropdownButtonFormField<int>(
                             value: selectedUnitId,
                             decoration: const InputDecoration(
-                              labelText: 'Satuan Barang *',
+                              labelText: 'Satuan Utama (Dasar) *',
                             ),
                             items: _controller.units
                                 .map(
-                                  (Unit u) => DropdownMenuItem<int>(
+                                  (u) => DropdownMenuItem<int>(
                                     value: u.id,
                                     child: Text(u.name),
                                   ),
@@ -133,32 +160,127 @@ class _ProductPageState extends State<ProductPage> {
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           textStyle: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
-                            height: 1.4,
                           ),
-                          message: 'Info Satuan Barang:\n'
-                              '• Digunakan sebagai satuan dasar perhitungan.\n'
-                              '• Stok dan penjualan bergantung pada satuan ini.\n'
-                              '• Batas stok minimum menggunakan satuan ini.',
-                          triggerMode: TooltipTriggerMode.tap,
+                          message:
+                              'Info Satuan Utama:\\n• Menjadi satuan dasar stok.\\n• Semua transaksi mengacu kesini.',
                           child: const Icon(
                             Icons.info_outline,
-                            size: 24,
                             color: AppColors.primary,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const Text(
+                      'Satuan Turunan (Opsional)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...tempDerivedUnits.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      _TempProductUnit tempUnit = entry.value;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<int>(
+                                value: tempUnit.unitId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pilih Satuan',
+                                ),
+                                items: _controller.units
+                                    .where((u) => u.id != selectedUnitId)
+                                    .map(
+                                      (u) => DropdownMenuItem<int>(
+                                        value: u.id,
+                                        child: Text(u.name),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) =>
+                                    setDialogState(() => tempUnit.unitId = val),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('='),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: tempUnit.multiplierController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Jumlah',
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<int>(
+                                value: tempUnit.parentUnitId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Terhadap Satuan',
+                                ),
+                                items: _controller.units
+                                    .map(
+                                      (u) => DropdownMenuItem<int>(
+                                        value: u.id,
+                                        child: Text(u.name),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) => setDialogState(
+                                  () => tempUnit.parentUnitId = val,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => setDialogState(
+                                () => tempDerivedUnits.removeAt(idx),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    TextButton.icon(
+                      onPressed: () {
+                        if (selectedUnitId == null) {
+                          SnackbarHelper.show(
+                            'Validasi',
+                            'Pilih Satuan Utama terlebih dahulu!',
+                            isError: true,
+                          );
+                          return;
+                        }
+                        setDialogState(
+                          () => tempDerivedUnits.add(
+                            _TempProductUnit(parentUnitId: selectedUnitId),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Tambah Satuan Turunan'),
+                    ),
+                    const Divider(),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -166,7 +288,7 @@ class _ProductPageState extends State<ProductPage> {
                           child: TextField(
                             controller: buyController,
                             decoration: const InputDecoration(
-                              labelText: 'Harga Beli (Satuan Barang)',
+                              labelText: 'Harga Beli (Satuan Dasar)',
                             ),
                             keyboardType: TextInputType.number,
                           ),
@@ -193,7 +315,7 @@ class _ProductPageState extends State<ProductPage> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Pilih Supplier (Bisa lebih dari satu)',
+                      'Pilih Supplier',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -205,19 +327,16 @@ class _ProductPageState extends State<ProductPage> {
                       spacing: 8.0,
                       runSpacing: 4.0,
                       children: _controller.suppliers.map((sup) {
-                        final isSelected = selectedSuppliers.contains(sup.id);
                         return FilterChip(
                           label: Text(sup.name),
-                          selected: isSelected,
+                          selected: selectedSuppliers.contains(sup.id),
                           selectedColor: AppColors.primary.withOpacity(0.2),
-                          checkmarkColor: AppColors.primary,
-                          onSelected: (bool selected) {
+                          onSelected: (selected) {
                             setDialogState(() {
-                              if (selected) {
+                              if (selected)
                                 selectedSuppliers.add(sup.id!);
-                              } else {
+                              else
                                 selectedSuppliers.remove(sup.id);
-                              }
                             });
                           },
                         );
@@ -241,10 +360,62 @@ class _ProductPageState extends State<ProductPage> {
               if (selectedUnitId == null) {
                 SnackbarHelper.show(
                   'Validasi',
-                  'Satuan Barang wajib dipilih!',
+                  'Satuan Utama wajib dipilih!',
                   isError: true,
                 );
                 return;
+              }
+
+              // Build Product Units array and calculate base multiplier
+              List<ProductUnit> finalProductUnits = [];
+              finalProductUnits.add(
+                ProductUnit(
+                  productId: product?.id ?? 0,
+                  unitId: selectedUnitId!,
+                  isBase: true,
+                  multiplierToBase: 1,
+                ),
+              );
+
+              int calcMult(int targetUnitId) {
+                if (targetUnitId == selectedUnitId) return 1;
+                var tpu = tempDerivedUnits.firstWhereOrNull(
+                  (e) => e.unitId == targetUnitId,
+                );
+                if (tpu == null || tpu.parentUnitId == null) return 1;
+                int parentM = calcMult(tpu.parentUnitId!);
+                int myM = int.tryParse(tpu.multiplierController.text) ?? 1;
+                return myM * parentM;
+              }
+
+              for (var tpu in tempDerivedUnits) {
+                if (tpu.unitId == null || tpu.parentUnitId == null) {
+                  SnackbarHelper.show(
+                    'Validasi',
+                    'Mohon lengkapi pilihan Satuan Turunan',
+                    isError: true,
+                  );
+                  return;
+                }
+                int myMult = int.tryParse(tpu.multiplierController.text) ?? 0;
+                if (myMult <= 0) {
+                  SnackbarHelper.show(
+                    'Validasi',
+                    'Multiplier harus > 0',
+                    isError: true,
+                  );
+                  return;
+                }
+                finalProductUnits.add(
+                  ProductUnit(
+                    productId: product?.id ?? 0,
+                    unitId: tpu.unitId!,
+                    isBase: false,
+                    parentUnitId: tpu.parentUnitId,
+                    multiplierToParent: myMult,
+                    multiplierToBase: calcMult(tpu.unitId!),
+                  ),
+                );
               }
 
               final newProduct = Product(
@@ -258,6 +429,7 @@ class _ProductPageState extends State<ProductPage> {
                 minStock: int.tryParse(minStockController.text) ?? 0,
                 stock: product?.stock ?? 0,
                 supplierIds: selectedSuppliers,
+                productUnits: finalProductUnits,
               );
 
               if (product == null) {

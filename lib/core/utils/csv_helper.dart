@@ -41,8 +41,8 @@ class CsvHelper {
 
   static String generateCsvTemplate() {
     List<List<dynamic>> rows = [
-      ["name", "barcode", "category_id", "base_unit", "buy_price", "buy_price_ppn", "sell_price", "min_stock", "stock"],
-      ["Contoh Barang", "123456789", "", "Pcs", "10000", "11100", "15000", "5", "100"]
+      ["name", "barcode", "category_id", "unit_id", "buy_price", "buy_price_ppn", "sell_price", "min_stock", "stock"],
+      ["Contoh Barang", "123456789", "1", "1", "10000", "11100", "15000", "5", "100"]
     ];
     return const ListToCsvConverter().convert(rows);
   }

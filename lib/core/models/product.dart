@@ -1,3 +1,5 @@
+import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
+
 class Product {
   final int? id;
   final int? categoryId;
@@ -11,12 +13,13 @@ class Product {
   final int stock;
   final String? createdAt;
   final String? updatedAt;
-  
+
   // Joined properties
   final String? categoryName;
   final String? unitName;
   List<int> supplierIds;
   final String? supplierNames; // For easy UI display
+  List<ProductUnit> productUnits;
 
   Product({
     this.id,
@@ -35,6 +38,7 @@ class Product {
     this.unitName,
     this.supplierIds = const [],
     this.supplierNames,
+    this.productUnits = const [],
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {

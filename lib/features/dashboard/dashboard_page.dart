@@ -7,6 +7,8 @@ import 'package:posapp_w6zxit6s/features/master_supplier/supplier_page.dart';
 import 'package:posapp_w6zxit6s/features/master_customer/customer_page.dart';
 import 'package:posapp_w6zxit6s/features/master_product/product_page.dart';
 import 'package:posapp_w6zxit6s/features/master_unit/unit_page.dart';
+import 'package:posapp_w6zxit6s/features/purchasing_invoice/purchase_invoice_page.dart';
+import 'package:posapp_w6zxit6s/features/purchasing_invoice/price_analysis_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -30,6 +32,8 @@ class _DashboardPageState extends State<DashboardPage> {
     const ProductPage(),
     const CustomerPage(),
     const UnitPage(),
+    PurchaseInvoicePage(),
+    PriceAnalysisPage(),
   ];
 
   @override
@@ -99,6 +103,25 @@ class _DashboardPageState extends State<DashboardPage> {
                 _buildMenuItem(5, Icons.straighten, "Master Satuan"),
                 _buildMenuItem(3, Icons.inventory, "Master Barang"),
                 _buildMenuItem(4, Icons.people, "Master Customer"),
+
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8.0,
+                    horizontal: 10.0,
+                  ),
+                  width: double.infinity,
+                  child: const Text(
+                    'PEMBELIAN',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildMenuItem(6, Icons.receipt_long, "Invoice Pembelian"),
+                _buildMenuItem(7, Icons.analytics, "Analisis Harga"),
 
                 const Spacer(),
                 const Divider(color: AppColors.accent),

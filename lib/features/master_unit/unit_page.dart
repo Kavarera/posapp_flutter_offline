@@ -18,11 +18,6 @@ class _UnitPageState extends State<UnitPage> {
 
   void _showFormDialog({Unit? unit}) {
     final nameController = TextEditingController(text: unit?.name ?? '');
-    final multiplierController = TextEditingController(
-      text: unit?.multiplierToDerived?.toString() ?? '',
-    );
-    bool hasDerived = unit?.hasDerived ?? false;
-    int? selectedDerivedId = unit?.derivedUnitId;
 
     Get.dialog(
       StatefulBuilder(
@@ -37,63 +32,6 @@ class _UnitPageState extends State<UnitPage> {
                   controller: nameController,
                   decoration: const InputDecoration(labelText: 'Nama Satuan *'),
                 ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Memiliki Turunan Satuan',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'Ceklis jika satuan ini memiliki turunan (Misal: 1 Karton = 10 Dus)',
-                  ),
-                  value: hasDerived,
-                  activeColor: AppColors.primary,
-                  onChanged: (val) {
-                    setDialogState(() {
-                      hasDerived = val ?? false;
-                      if (!hasDerived) {
-                        selectedDerivedId = null;
-                        multiplierController.clear();
-                      }
-                    });
-                  },
-                ),
-                if (hasDerived) ...[
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedDerivedId,
-                    decoration: const InputDecoration(
-                      labelText: 'Pilih Satuan Turunan *',
-                    ),
-                    items: _controller.units
-                        .where(
-                          (u) => u.id != unit?.id,
-                        ) // Prevent self-reference
-                        .map(
-                          (u) => DropdownMenuItem(
-                            value: u.id,
-                            child: Text(u.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        selectedDerivedId = val;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: multiplierController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nilai Turunan (Kalkulasi) *',
-                      helperText:
-                          'Contoh: Jika 1 Karton = 10 Dus, isi dengan 10',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ],
               ],
             ),
             onCancel: () => Get.back(),
@@ -106,34 +44,10 @@ class _UnitPageState extends State<UnitPage> {
                 );
                 return;
               }
-              if (hasDerived) {
-                if (selectedDerivedId == null) {
-                  SnackbarHelper.show(
-                    'Validasi',
-                    'Satuan Turunan harus dipilih!',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (multiplierController.text.trim().isEmpty ||
-                    (int.tryParse(multiplierController.text) ?? 0) <= 0) {
-                  SnackbarHelper.show(
-                    'Validasi',
-                    'Nilai Turunan harus berupa angka lebih dari 0!',
-                    isError: true,
-                  );
-                  return;
-                }
-              }
 
               final newUnit = Unit(
                 id: unit?.id,
                 name: nameController.text.trim(),
-                hasDerived: hasDerived,
-                derivedUnitId: hasDerived ? selectedDerivedId : null,
-                multiplierToDerived: hasDerived
-                    ? int.tryParse(multiplierController.text)
-                    : null,
               );
 
               if (unit == null) {
@@ -186,7 +100,7 @@ class _UnitPageState extends State<UnitPage> {
                   maxCrossAxisExtent: 350,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  mainAxisExtent: 140,
+                  mainAxisExtent: 100,
                 ),
                 itemCount: _controller.units.length,
                 itemBuilder: (context, index) {
@@ -196,6 +110,7 @@ class _UnitPageState extends State<UnitPage> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -231,9 +146,7 @@ class _UnitPageState extends State<UnitPage> {
                                       Get.dialog(
                                         CustomDialog(
                                           title: 'Hapus Satuan',
-                                          content: Text(
-                                            'Hapus ${unit.name}? Jika dihapus, stok dan harga pada barang akan disesuaikan otomatis.',
-                                          ),
+                                          content: Text('Hapus ${unit.name}?'),
                                           confirmText: 'Hapus',
                                           isDestructive: true,
                                           onCancel: () => Get.back(),
@@ -251,59 +164,6 @@ class _UnitPageState extends State<UnitPage> {
                               ),
                             ],
                           ),
-                          const Spacer(),
-                          if (unit.hasDerived) ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.background.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calculate_outlined,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '1 ${unit.name} = ${unit.multiplierToDerived} ${unit.derivedUnitName}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Satuan Utama Dasar',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

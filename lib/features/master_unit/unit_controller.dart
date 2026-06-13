@@ -21,14 +21,8 @@ class UnitController extends GetxController {
     try {
       isLoading.value = true;
       Database db = await _dbHelper.database;
-      
-      // Fetch units with their derived unit name
-      final List<Map<String, dynamic>> maps = await db.rawQuery('''
-        SELECT u1.*, u2.name as derived_unit_name
-        FROM units u1
-        LEFT JOIN units u2 ON u1.derived_unit_id = u2.id
-      ''');
 
+      final List<Map<String, dynamic>> maps = await db.query('units');
       units.value = maps.map((e) => Unit.fromJson(e)).toList();
     } catch (e) {
       _logger.e("Error fetching units", error: e);
@@ -53,7 +47,12 @@ class UnitController extends GetxController {
   Future<void> updateUnit(Unit unit) async {
     try {
       Database db = await _dbHelper.database;
-      await db.update('units', unit.toJson(), where: 'id = ?', whereArgs: [unit.id]);
+      await db.update(
+        'units',
+        unit.toJson(),
+        where: 'id = ?',
+        whereArgs: [unit.id],
+      );
       _logger.i("Unit ${unit.id} updated");
       await fetchUnits();
     } catch (e) {
@@ -65,48 +64,18 @@ class UnitController extends GetxController {
   Future<void> deleteUnit(int id) async {
     try {
       Database db = await _dbHelper.database;
-      
-      // Find the unit
-      List<Map<String, dynamic>> unitMaps = await db.query('units', where: 'id = ?', whereArgs: [id]);
-      if (unitMaps.isEmpty) return;
-      Unit unitToDelete = Unit.fromJson(unitMaps.first);
 
-      await db.transaction((txn) async {
-        if (unitToDelete.hasDerived && unitToDelete.derivedUnitId != null && unitToDelete.multiplierToDerived != null) {
-          // It's a unit with a derived unit (e.g. Karton -> Dus).
-          // If we delete Karton, products using Karton must fall back to Dus.
-          // stock = stock * multiplier
-          // buy_price = buy_price / multiplier
-          // sell_price = sell_price / multiplier
-          
-          List<Map<String, dynamic>> products = await txn.query('products', where: 'unit_id = ?', whereArgs: [id]);
-          for (var p in products) {
-            int oldStock = p['stock'] as int;
-            double oldBuy = (p['buy_price'] as num).toDouble();
-            double oldSell = (p['sell_price'] as num).toDouble();
-            
-            await txn.update('products', {
-              'unit_id': unitToDelete.derivedUnitId,
-              'stock': oldStock * unitToDelete.multiplierToDerived!,
-              'buy_price': oldBuy / unitToDelete.multiplierToDerived!,
-              'sell_price': oldSell / unitToDelete.multiplierToDerived!,
-            }, where: 'id = ?', whereArgs: [p['id']]);
-          }
-        } else {
-          // If it's a primary unit without derived, delete all products using it (Rule 5)
-          await txn.delete('products', where: 'unit_id = ?', whereArgs: [id]);
-        }
-        
-        // Remove unit
-        await txn.delete('units', where: 'id = ?', whereArgs: [id]);
-      });
-      
+      await db.delete('units', where: 'id = ?', whereArgs: [id]);
+
       _logger.i("Unit $id deleted");
       await fetchUnits();
-      Get.snackbar('Sukses', 'Satuan berhasil dihapus dan produk terkait telah disesuaikan.');
+      Get.snackbar('Sukses', 'Satuan berhasil dihapus.');
     } catch (e) {
       _logger.e("Error deleting unit", error: e);
-      Get.snackbar('Error', 'Gagal menghapus satuan. Pastikan tidak ada satuan lain yang menjadikannya turunan.');
+      Get.snackbar(
+        'Error',
+        'Gagal menghapus satuan. Pastikan tidak ada barang yang menggunakan satuan ini.',
+      );
     }
   }
 }
