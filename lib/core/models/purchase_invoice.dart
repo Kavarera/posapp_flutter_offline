@@ -9,6 +9,8 @@ class PurchaseInvoice {
   final String? dueDate;
   final String paymentMethod;
   final double totalNominal;
+  final double paidAmount;
+  final String status;
   final List<String> documentPaths;
   final String createdAt;
   
@@ -24,6 +26,8 @@ class PurchaseInvoice {
     this.dueDate,
     required this.paymentMethod,
     this.totalNominal = 0,
+    this.paidAmount = 0,
+    this.status = 'Belum Lunas',
     this.documentPaths = const [],
     required this.createdAt,
     this.details = const [],
@@ -48,6 +52,8 @@ class PurchaseInvoice {
       dueDate: json['due_date'] as String?,
       paymentMethod: json['payment_method'] as String,
       totalNominal: (json['total_nominal'] as num?)?.toDouble() ?? 0,
+      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
+      status: json['status'] as String? ?? 'Belum Lunas',
       documentPaths: docs,
       createdAt: json['created_at'] as String,
     );
@@ -62,6 +68,8 @@ class PurchaseInvoice {
       'due_date': dueDate,
       'payment_method': paymentMethod,
       'total_nominal': totalNominal,
+      'paid_amount': paidAmount,
+      'status': status,
       'document_paths': jsonEncode(documentPaths),
       'created_at': createdAt,
     };

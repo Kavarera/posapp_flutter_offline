@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:posapp_w6zxit6s/core/constants/app_constants.dart';
+import 'package:posapp_w6zxit6s/core/services/path_service.dart';
 import 'package:logger/logger.dart';
 
 class DatabaseHelper {
@@ -30,15 +31,14 @@ class DatabaseHelper {
       databaseFactory = databaseFactoryFfi;
     }
 
-    Directory documentsDirectory = await getApplicationSupportDirectory();
-    String path = join(documentsDirectory.path, "kavarera_pos.db");
+    String path = PathService.dbPath;
 
     _logger.i("Initializing database at: $path");
 
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 6,
+        version: 7,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -49,6 +49,10 @@ class DatabaseHelper {
     _logger.i(
       "Upgrading database from v$oldVersion to v$newVersion. Dropping all tables and recreating.",
     );
+    await db.execute('DROP TABLE IF EXISTS stock_movements');
+    await db.execute('DROP TABLE IF EXISTS payment_transactions');
+    await db.execute('DROP TABLE IF EXISTS sales_transaction_details');
+    await db.execute('DROP TABLE IF EXISTS sales_transactions');
     await db.execute('DROP TABLE IF EXISTS purchase_invoice_details');
     await db.execute('DROP TABLE IF EXISTS purchase_invoices');
     await db.execute('DROP TABLE IF EXISTS product_suppliers');
@@ -72,6 +76,7 @@ class DatabaseHelper {
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         pin_hash TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
         role TEXT NOT NULL DEFAULT 'Kasir'
       )
     ''');
@@ -177,6 +182,8 @@ class DatabaseHelper {
         due_date TEXT,
         payment_method TEXT NOT NULL,
         total_nominal REAL NOT NULL DEFAULT 0,
+        paid_amount REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'Belum Lunas',
         document_paths TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE RESTRICT
@@ -197,6 +204,69 @@ class DatabaseHelper {
         FOREIGN KEY (invoice_id) REFERENCES purchase_invoices (id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT,
         FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE RESTRICT
+      )
+    ''');
+
+    // 10. Sales Transactions table (Header)
+    await db.execute('''
+      CREATE TABLE sales_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_number TEXT UNIQUE NOT NULL,
+        customer_id INTEGER,
+        transaction_date TEXT NOT NULL,
+        due_date TEXT,
+        payment_method TEXT NOT NULL,
+        total_nominal REAL NOT NULL DEFAULT 0,
+        paid_amount REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'Lunas',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
+      )
+    ''');
+
+    // 11. Sales Transaction Details table
+    await db.execute('''
+      CREATE TABLE sales_transaction_details (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        unit_id INTEGER NOT NULL,
+        qty INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        base_unit_price REAL NOT NULL,
+        FOREIGN KEY (transaction_id) REFERENCES sales_transactions (id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT,
+        FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE RESTRICT
+      )
+    ''');
+
+    // 12. Payment Transactions table (Hutang / Piutang)
+    await db.execute('''
+      CREATE TABLE payment_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference_type TEXT NOT NULL, -- 'payable' or 'receivable'
+        reference_id INTEGER NOT NULL, -- purchase_invoice_id or sales_transaction_id
+        amount REAL NOT NULL,
+        payment_date TEXT NOT NULL,
+        proof_document_path TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    // 13. Stock Movements table (Kartu Stok)
+    await db.execute('''
+      CREATE TABLE stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        type TEXT NOT NULL, -- 'IN', 'OUT', 'ADJ'
+        reference_id INTEGER, -- invoice_id or transaction_id
+        qty INTEGER NOT NULL,
+        balance_after INTEGER NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
       )
     ''');
 
@@ -327,14 +397,18 @@ class DatabaseHelper {
       int daysAgo = random.nextInt(90); // Last 90 days
       DateTime invDate = now.subtract(Duration(days: daysAgo));
 
+      bool isHutang = random.nextBool();
       batch.insert('purchase_invoices', {
         'id': i,
         'invoice_number': 'INV-2026-${i.toString().padLeft(5, '0')}',
         'supplier_invoice_number': 'SUP-${i}',
         'supplier_id': supplierId,
         'invoice_date': invDate.toIso8601String(),
-        'payment_method': 'Tunai',
+        'payment_method': isHutang ? 'Hutang' : 'Tunai',
+        'due_date': isHutang ? invDate.add(const Duration(days: 30)).toIso8601String() : null,
         'total_nominal': 0, // Will update below
+        'paid_amount': 0, // Will update below if Tunai
+        'status': isHutang ? 'Belum Lunas' : 'Lunas',
         'created_at': invDate.toIso8601String(),
       });
 
@@ -370,16 +444,120 @@ class DatabaseHelper {
         });
 
         // Also add stock directly for dummy
+        int addedQty = useKarton ? qty * 40 : qty;
         batch.rawUpdate('UPDATE products SET stock = stock + ? WHERE id = ?', [
-          useKarton ? qty * 40 : qty,
+          addedQty,
           productId,
         ]);
+        
+        // Add to stock movements
+        batch.insert('stock_movements', {
+           'product_id': productId,
+           'type': 'IN',
+           'reference_id': i,
+           'qty': addedQty,
+           'balance_after': 0, // In a real scenario we need current stock, but dummy just 0 or query it. Since it's batch, we just put addedQty.
+           'note': 'Pembelian INV-2026-${i.toString().padLeft(5, '0')}',
+           'created_at': invDate.toIso8601String()
+        });
       }
 
       batch.rawUpdate(
-        'UPDATE purchase_invoices SET total_nominal = ? WHERE id = ?',
-        [totalNominal, i],
+        'UPDATE purchase_invoices SET total_nominal = ?, paid_amount = ? WHERE id = ?',
+        [totalNominal, isHutang ? 0 : totalNominal, i],
       );
+      if (isHutang) {
+        batch.rawUpdate('UPDATE suppliers SET debt_balance = debt_balance + ? WHERE id = ?', [totalNominal, supplierId]);
+      }
+    }
+
+    // 6. Customers
+    List<String> customerNames = [
+      'Pelanggan Umum',
+      'Toko A',
+      'Toko B',
+      'Warung C',
+      'Individu D',
+    ];
+    for (int i = 0; i < customerNames.length; i++) {
+      batch.insert('customers', {
+        'id': i + 1,
+        'name': customerNames[i],
+        'receivable_balance': 0,
+        'status': 'Aktif',
+        'created_at': now.toIso8601String(),
+      });
+    }
+
+    // 7. Sales Transactions (300 Invoices)
+    for (int i = 1; i <= 300; i++) {
+      int customerId = random.nextInt(customerNames.length) + 1;
+      int daysAgo = random.nextInt(90); // Last 90 days
+      DateTime transDate = now.subtract(Duration(days: daysAgo));
+      bool isPiutang = random.nextBool() && customerId != 1; // Pelanggan Umum jarang piutang
+
+      batch.insert('sales_transactions', {
+        'id': i,
+        'transaction_number': 'TRX-2026-${i.toString().padLeft(5, '0')}',
+        'customer_id': customerId,
+        'transaction_date': transDate.toIso8601String(),
+        'due_date': isPiutang ? transDate.add(const Duration(days: 14)).toIso8601String() : null,
+        'payment_method': isPiutang ? 'Hutang' : 'Tunai',
+        'total_nominal': 0,
+        'paid_amount': 0,
+        'status': isPiutang ? 'Belum Lunas' : 'Lunas',
+        'created_at': transDate.toIso8601String(),
+      });
+
+      double totalNominal = 0;
+      int detailsCount = random.nextInt(3) + 1;
+
+      for (int d = 0; d < detailsCount; d++) {
+        int productId = random.nextInt(products.length) + 1;
+        bool useKarton = random.nextBool();
+        int unitId = useKarton ? 4 : 1;
+        int qty = random.nextInt(5) + 1;
+
+        double basePrice = 2000.0 + (productId * 500);
+        double sellBasePrice = 3000.0 + (productId * 500);
+        double unitPrice = useKarton ? sellBasePrice * 40 : sellBasePrice;
+        double totalPrice = unitPrice * qty;
+        totalNominal += totalPrice;
+
+        batch.insert('sales_transaction_details', {
+          'transaction_id': i,
+          'product_id': productId,
+          'unit_id': unitId,
+          'qty': qty,
+          'unit_price': unitPrice,
+          'total_price': totalPrice,
+          'base_unit_price': basePrice,
+        });
+
+        int deductedQty = useKarton ? qty * 40 : qty;
+        batch.rawUpdate('UPDATE products SET stock = stock - ? WHERE id = ?', [
+          deductedQty,
+          productId,
+        ]);
+        
+        batch.insert('stock_movements', {
+           'product_id': productId,
+           'type': 'OUT',
+           'reference_id': i,
+           'qty': deductedQty,
+           'balance_after': 0,
+           'note': 'Penjualan TRX-2026-${i.toString().padLeft(5, '0')}',
+           'created_at': transDate.toIso8601String()
+        });
+      }
+
+      batch.rawUpdate(
+        'UPDATE sales_transactions SET total_nominal = ?, paid_amount = ? WHERE id = ?',
+        [totalNominal, isPiutang ? 0 : totalNominal, i],
+      );
+      if (isPiutang) {
+        batch.rawUpdate('UPDATE customers SET receivable_balance = receivable_balance + ? WHERE id = ?', [totalNominal, customerId]);
+      }
     }
 
     await batch.commit(noResult: true);

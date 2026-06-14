@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 
 import 'package:posapp_w6zxit6s/core/database/database_helper.dart';
 import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
+import 'package:posapp_w6zxit6s/core/services/session_service.dart';
 
 class AuthController extends GetxController {
   final _secureStorage = const FlutterSecureStorage();
@@ -31,9 +32,15 @@ class AuthController extends GetxController {
   Future<void> _checkExistingSession() async {
     try {
       String? token = await _secureStorage.read(key: 'session_token');
-      if (token != null) {
-        _logger.i("Existing session found. Redirecting to dashboard...");
-        Get.offAllNamed(AppRoutes.dashboard);
+      String? role = await _secureStorage.read(key: 'session_role');
+      if (token != null && role != null) {
+        Get.find<SessionService>().setSession(token, role);
+        _logger.i("Existing session found. Redirecting...");
+        if (role == 'Kasir') {
+          Get.offAllNamed(AppRoutes.pos);
+        } else {
+          Get.offAllNamed(AppRoutes.dashboard);
+        }
       }
     } catch (e) {
       _logger.e("Failed to check session", error: e);
@@ -78,8 +85,14 @@ class AuthController extends GetxController {
         await _secureStorage.write(key: 'session_token', value: user['id'].toString());
         await _secureStorage.write(key: 'session_role', value: user['role'].toString());
         
+        Get.find<SessionService>().setSession(user['id'].toString(), user['role'].toString());
+        
         _logger.i("User $username logged in successfully.");
-        Get.offAllNamed(AppRoutes.dashboard);
+        if (user['role'] == 'Kasir') {
+          Get.offAllNamed(AppRoutes.pos);
+        } else {
+          Get.offAllNamed(AppRoutes.dashboard);
+        }
       } else {
         throw Exception("Password atau PIN salah.");
       }
@@ -96,6 +109,7 @@ class AuthController extends GetxController {
   Future<void> logout() async {
     await _secureStorage.delete(key: 'session_token');
     await _secureStorage.delete(key: 'session_role');
+    Get.find<SessionService>().clearSession();
     Get.offAllNamed(AppRoutes.login);
   }
 }

@@ -9,12 +9,13 @@ import 'package:posapp_w6zxit6s/core/theme/app_theme.dart';
 import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
 import 'package:posapp_w6zxit6s/features/auth/login_page.dart';
 import 'package:posapp_w6zxit6s/features/dashboard/dashboard_page.dart';
+import 'package:posapp_w6zxit6s/core/services/session_service.dart';
+import 'package:posapp_w6zxit6s/core/services/path_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-
-
+  await Get.putAsync(() => PathService().init());
+  Get.put(SessionService());
   // Initialize Desktop Window Manager
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();

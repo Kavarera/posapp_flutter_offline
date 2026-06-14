@@ -6,6 +6,7 @@ import 'package:posapp_w6zxit6s/core/models/category.dart';
 import 'package:posapp_w6zxit6s/core/models/unit.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/master_product/product_controller.dart';
+import 'package:posapp_w6zxit6s/core/services/path_service.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
 import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
 import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
@@ -491,9 +492,9 @@ class _ProductPageState extends State<ProductPage> {
                 children: [
                   OutlinedButton.icon(
                     onPressed: () async {
-                      var dir = await getApplicationDocumentsDirectory();
+                      String dir = PathService.templatesDir;
                       _controller.exportCsvTemplate(
-                        "${dir.path}\\template_barang.csv",
+                        "$dir\\template_barang.csv",
                       );
                     },
                     icon: const Icon(Icons.download, color: Colors.black),

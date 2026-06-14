@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:get/get.dart';
 import 'package:logger/logger.dart';
 import 'package:posapp_w6zxit6s/core/database/database_helper.dart';
+import 'package:posapp_w6zxit6s/core/services/path_service.dart';
 import 'package:posapp_w6zxit6s/core/models/purchase_invoice.dart';
 import 'package:posapp_w6zxit6s/core/models/supplier.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
@@ -179,11 +180,7 @@ class PurchaseInvoiceController extends GetxController {
         // 1. Copy files to permanent storage
         List<String> permanentPaths = [];
         if (tempFilePaths.isNotEmpty) {
-          Directory docsDir = await getApplicationSupportDirectory();
-          Directory invoicesDir = Directory(p.join(docsDir.path, 'Invoices'));
-          if (!await invoicesDir.exists()) {
-            await invoicesDir.create(recursive: true);
-          }
+          String invoicesDir = PathService.invoicesDir;
 
           for (var tempPath in tempFilePaths) {
             File tempFile = File(tempPath);
@@ -192,7 +189,7 @@ class PurchaseInvoiceController extends GetxController {
               // append timestamp to prevent filename collision
               String newFileName =
                   '${DateTime.now().millisecondsSinceEpoch}_$fileName';
-              String permPath = p.join(invoicesDir.path, newFileName);
+              String permPath = p.join(invoicesDir, newFileName);
               await tempFile.copy(permPath);
               permanentPaths.add(permPath);
             }
@@ -208,6 +205,8 @@ class PurchaseInvoiceController extends GetxController {
           dueDate: invoice.dueDate,
           paymentMethod: invoice.paymentMethod,
           totalNominal: invoice.totalNominal,
+          paidAmount: invoice.paymentMethod == 'Tunai' ? invoice.totalNominal : 0.0,
+          status: invoice.paymentMethod == 'Tunai' ? 'Lunas' : 'Belum Lunas',
           documentPaths: permanentPaths,
           createdAt: DateTime.now().toIso8601String(),
         );
@@ -243,6 +242,17 @@ class PurchaseInvoiceController extends GetxController {
             'UPDATE products SET stock = stock + ? WHERE id = ?',
             [addedStock, d.productId],
           );
+
+          // Add to stock_movements
+          await txn.insert('stock_movements', {
+            'product_id': d.productId,
+            'type': 'IN',
+            'reference_id': invoiceId,
+            'qty': addedStock,
+            'balance_after': 0, // In real app, query current stock first
+            'note': 'Pembelian ${invoice.invoiceNumber}',
+            'created_at': DateTime.now().toIso8601String(),
+          });
         }
 
         // 4. Update Supplier Debt if Hutang

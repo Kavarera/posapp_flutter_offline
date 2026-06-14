@@ -9,6 +9,11 @@ import 'package:posapp_w6zxit6s/features/master_product/product_page.dart';
 import 'package:posapp_w6zxit6s/features/master_unit/unit_page.dart';
 import 'package:posapp_w6zxit6s/features/purchasing_invoice/purchase_invoice_page.dart';
 import 'package:posapp_w6zxit6s/features/purchasing_invoice/price_analysis_page.dart';
+import 'package:posapp_w6zxit6s/features/monitoring_finance/finance_monitoring_page.dart';
+import 'package:posapp_w6zxit6s/features/monitoring_stock/stock_card_page.dart';
+import 'package:posapp_w6zxit6s/features/reporting/report_dashboard_page.dart';
+import 'package:posapp_w6zxit6s/features/user_management/user_management_page.dart';
+import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -34,6 +39,10 @@ class _DashboardPageState extends State<DashboardPage> {
     const UnitPage(),
     PurchaseInvoicePage(),
     PriceAnalysisPage(),
+    FinanceMonitoringPage(),
+    StockCardPage(),
+    ReportDashboardPage(),
+    UserManagementPage(),
   ];
 
   @override
@@ -64,7 +73,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 32),
 
-                Container(
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 8.0,
                     horizontal: 10.0,
@@ -123,7 +136,35 @@ class _DashboardPageState extends State<DashboardPage> {
                 _buildMenuItem(6, Icons.receipt_long, "Invoice Pembelian"),
                 _buildMenuItem(7, Icons.analytics, "Analisis Harga"),
 
-                const Spacer(),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
+                  width: double.infinity,
+                  child: const Text('MONITORING', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                _buildMenuItem(8, Icons.account_balance_wallet, "Hutang & Piutang"),
+                _buildMenuItem(9, Icons.history, "Kartu Stok"),
+
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
+                  width: double.infinity,
+                  child: const Text('ADMIN', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                _buildMenuItem(10, Icons.bar_chart, "Laporan Analitik"),
+                _buildMenuItem(11, Icons.manage_accounts, "Manajemen Akun"),
+                    ],
+                  ),
+                ),
+
+                const Divider(color: AppColors.accent),
+                ListTile(
+                  leading: const Icon(Icons.point_of_sale, color: Colors.orange),
+                  title: const Text('Masuk Kasir', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                  onTap: () {
+                    Get.toNamed(AppRoutes.pos);
+                  },
+                ),
                 const Divider(color: AppColors.accent),
                 ListTile(
                   leading: const Icon(Icons.logout, color: AppColors.white),

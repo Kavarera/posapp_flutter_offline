@@ -58,6 +58,20 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     setState(() {});
   }
 
+  void _resetForm() {
+    setState(() {
+      _supplierInvController.clear();
+      _selectedSupplier = null;
+      _supplierProducts.clear();
+      _details.clear();
+      _tempFilePaths.clear();
+      _paymentMethod = 'Tunai';
+      _invoiceDate = DateTime.now();
+      _dueDate = null;
+    });
+    _loadInitialData();
+  }
+
   Future<void> _onSupplierChanged(Supplier? supplier) async {
     setState(() {
       _selectedSupplier = supplier;
@@ -196,7 +210,7 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     );
     setState(() => _isSaving = false);
     if (success) {
-      Get.back();
+      _resetForm();
     }
   }
 
