@@ -24,6 +24,14 @@ class DatabaseHelper {
     return _database!;
   }
 
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      _logger.i("Database closed and released.");
+    }
+  }
+
   Future<Database> _initDatabase() async {
     // Initialize FFI for Windows
     if (Platform.isWindows || Platform.isLinux) {
@@ -38,7 +46,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 7,
+        version: 8,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -46,24 +54,18 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    _logger.i(
-      "Upgrading database from v$oldVersion to v$newVersion. Dropping all tables and recreating.",
-    );
-    await db.execute('DROP TABLE IF EXISTS stock_movements');
-    await db.execute('DROP TABLE IF EXISTS payment_transactions');
-    await db.execute('DROP TABLE IF EXISTS sales_transaction_details');
-    await db.execute('DROP TABLE IF EXISTS sales_transactions');
-    await db.execute('DROP TABLE IF EXISTS purchase_invoice_details');
-    await db.execute('DROP TABLE IF EXISTS purchase_invoices');
-    await db.execute('DROP TABLE IF EXISTS product_suppliers');
-    await db.execute('DROP TABLE IF EXISTS product_units'); // Old table
-    await db.execute('DROP TABLE IF EXISTS products');
-    await db.execute('DROP TABLE IF EXISTS units');
-    await db.execute('DROP TABLE IF EXISTS categories');
-    await db.execute('DROP TABLE IF EXISTS suppliers');
-    await db.execute('DROP TABLE IF EXISTS customers');
-    await db.execute('DROP TABLE IF EXISTS users');
-    await _onCreate(db, newVersion);
+    _logger.i("Upgrading database from v$oldVersion to v$newVersion.");
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE admin_notes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT,
+          content TEXT,
+          display_order INTEGER,
+          created_at TEXT
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -260,8 +262,8 @@ class DatabaseHelper {
       CREATE TABLE stock_movements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
-        type TEXT NOT NULL, -- 'IN', 'OUT', 'ADJ'
-        reference_id INTEGER, -- invoice_id or transaction_id
+        type TEXT NOT NULL, -- 'IN', 'OUT', 'ADJUSTMENT'
+        reference_id INTEGER, -- e.g., purchase_invoice_id, sales_transaction_id
         qty INTEGER NOT NULL,
         balance_after INTEGER NOT NULL,
         note TEXT,
@@ -270,10 +272,21 @@ class DatabaseHelper {
       )
     ''');
 
+    // 14. Admin Notes table
+    await db.execute('''
+      CREATE TABLE admin_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        content TEXT,
+        display_order INTEGER,
+        created_at TEXT
+      )
+    ''');
+
     // Seed default admin and default unit "Pcs"
     await _seedAdmin(db);
     await _seedDefaultData(db);
-    await _seedDummyDataForTesting(db);
+    // await _seedDummyDataForTesting(db); // Disabled per user request
   }
 
   Future<void> _seedAdmin(Database db) async {
@@ -375,7 +388,7 @@ class DatabaseHelper {
       int numSupp = random.nextInt(3) + 2; // 2, 3 or 4 suppliers
       List<int> sList = [1, 2, 3, 4, 5];
       sList.shuffle(random);
-      for(int j=0; j<numSupp; j++) {
+      for (int j = 0; j < numSupp; j++) {
         int sId = sList[j];
         batch.insert('product_suppliers', {
           'product_id': p['id'],
@@ -392,7 +405,9 @@ class DatabaseHelper {
       int supplierId = 1;
       while (true) {
         supplierId = random.nextInt(supplierNames.length) + 1;
-        if (supplierProducts[supplierId] != null && supplierProducts[supplierId]!.isNotEmpty) break;
+        if (supplierProducts[supplierId] != null &&
+            supplierProducts[supplierId]!.isNotEmpty)
+          break;
       }
       int daysAgo = random.nextInt(90); // Last 90 days
       DateTime invDate = now.subtract(Duration(days: daysAgo));
@@ -405,7 +420,9 @@ class DatabaseHelper {
         'supplier_id': supplierId,
         'invoice_date': invDate.toIso8601String(),
         'payment_method': isHutang ? 'Hutang' : 'Tunai',
-        'due_date': isHutang ? invDate.add(const Duration(days: 30)).toIso8601String() : null,
+        'due_date': isHutang
+            ? invDate.add(const Duration(days: 30)).toIso8601String()
+            : null,
         'total_nominal': 0, // Will update below
         'paid_amount': 0, // Will update below if Tunai
         'status': isHutang ? 'Belum Lunas' : 'Lunas',
@@ -449,16 +466,17 @@ class DatabaseHelper {
           addedQty,
           productId,
         ]);
-        
+
         // Add to stock movements
         batch.insert('stock_movements', {
-           'product_id': productId,
-           'type': 'IN',
-           'reference_id': i,
-           'qty': addedQty,
-           'balance_after': 0, // In a real scenario we need current stock, but dummy just 0 or query it. Since it's batch, we just put addedQty.
-           'note': 'Pembelian INV-2026-${i.toString().padLeft(5, '0')}',
-           'created_at': invDate.toIso8601String()
+          'product_id': productId,
+          'type': 'IN',
+          'reference_id': i,
+          'qty': addedQty,
+          'balance_after':
+              0, // In a real scenario we need current stock, but dummy just 0 or query it. Since it's batch, we just put addedQty.
+          'note': 'Pembelian INV-2026-${i.toString().padLeft(5, '0')}',
+          'created_at': invDate.toIso8601String(),
         });
       }
 
@@ -467,7 +485,10 @@ class DatabaseHelper {
         [totalNominal, isHutang ? 0 : totalNominal, i],
       );
       if (isHutang) {
-        batch.rawUpdate('UPDATE suppliers SET debt_balance = debt_balance + ? WHERE id = ?', [totalNominal, supplierId]);
+        batch.rawUpdate(
+          'UPDATE suppliers SET debt_balance = debt_balance + ? WHERE id = ?',
+          [totalNominal, supplierId],
+        );
       }
     }
 
@@ -494,14 +515,17 @@ class DatabaseHelper {
       int customerId = random.nextInt(customerNames.length) + 1;
       int daysAgo = random.nextInt(90); // Last 90 days
       DateTime transDate = now.subtract(Duration(days: daysAgo));
-      bool isPiutang = random.nextBool() && customerId != 1; // Pelanggan Umum jarang piutang
+      bool isPiutang =
+          random.nextBool() && customerId != 1; // Pelanggan Umum jarang piutang
 
       batch.insert('sales_transactions', {
         'id': i,
         'transaction_number': 'TRX-2026-${i.toString().padLeft(5, '0')}',
         'customer_id': customerId,
         'transaction_date': transDate.toIso8601String(),
-        'due_date': isPiutang ? transDate.add(const Duration(days: 14)).toIso8601String() : null,
+        'due_date': isPiutang
+            ? transDate.add(const Duration(days: 14)).toIso8601String()
+            : null,
         'payment_method': isPiutang ? 'Hutang' : 'Tunai',
         'total_nominal': 0,
         'paid_amount': 0,
@@ -539,15 +563,15 @@ class DatabaseHelper {
           deductedQty,
           productId,
         ]);
-        
+
         batch.insert('stock_movements', {
-           'product_id': productId,
-           'type': 'OUT',
-           'reference_id': i,
-           'qty': deductedQty,
-           'balance_after': 0,
-           'note': 'Penjualan TRX-2026-${i.toString().padLeft(5, '0')}',
-           'created_at': transDate.toIso8601String()
+          'product_id': productId,
+          'type': 'OUT',
+          'reference_id': i,
+          'qty': deductedQty,
+          'balance_after': 0,
+          'note': 'Penjualan TRX-2026-${i.toString().padLeft(5, '0')}',
+          'created_at': transDate.toIso8601String(),
         });
       }
 
@@ -556,7 +580,10 @@ class DatabaseHelper {
         [totalNominal, isPiutang ? 0 : totalNominal, i],
       );
       if (isPiutang) {
-        batch.rawUpdate('UPDATE customers SET receivable_balance = receivable_balance + ? WHERE id = ?', [totalNominal, customerId]);
+        batch.rawUpdate(
+          'UPDATE customers SET receivable_balance = receivable_balance + ? WHERE id = ?',
+          [totalNominal, customerId],
+        );
       }
     }
 

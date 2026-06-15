@@ -22,7 +22,8 @@ class _TempProductUnit {
 }
 
 class ProductPage extends StatefulWidget {
-  const ProductPage({super.key});
+  final bool autoOpenAddDialog;
+  const ProductPage({super.key, this.autoOpenAddDialog = false});
 
   @override
   State<ProductPage> createState() => _ProductPageState();
@@ -41,6 +42,12 @@ class _ProductPageState extends State<ProductPage> {
         _controller.fetchProducts(loadMore: true);
       }
     });
+
+    if (widget.autoOpenAddDialog) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFormDialog(product: null);
+      });
+    }
   }
 
   @override

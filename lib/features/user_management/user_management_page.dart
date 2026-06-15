@@ -3,12 +3,28 @@ import 'package:get/get.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'user_management_controller.dart';
 
-class UserManagementPage extends StatelessWidget {
-  UserManagementPage({Key? key}) : super(key: key);
+class UserManagementPage extends StatefulWidget {
+  final bool autoOpenAddDialog;
+  const UserManagementPage({super.key, this.autoOpenAddDialog = false});
 
+  @override
+  State<UserManagementPage> createState() => _UserManagementPageState();
+}
+
+class _UserManagementPageState extends State<UserManagementPage> {
   final UserManagementController _controller = Get.put(
     UserManagementController(),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoOpenAddDialog) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showAddUserDialog();
+      });
+    }
+  }
 
   void _showAddUserDialog() {
     String username = '';

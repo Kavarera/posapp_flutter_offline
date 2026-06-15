@@ -14,6 +14,7 @@ import 'package:posapp_w6zxit6s/features/monitoring_stock/stock_card_page.dart';
 import 'package:posapp_w6zxit6s/features/reporting/report_dashboard_page.dart';
 import 'package:posapp_w6zxit6s/features/user_management/user_management_page.dart';
 import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
+import 'package:posapp_w6zxit6s/features/dashboard/dashboard_content.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,9 +29,28 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
 
   // Placeholder pages for Master Data
-  final List<Widget> _pages = [
-    const Center(
-      child: Text("Welcome to Kavarera POS", style: TextStyle(fontSize: 24)),
+  late final List<Widget> _pages = [
+    DashboardContent(
+      onNavigate: (index, {bool autoOpenAddDialog = false}) {
+        if (index == 3) {
+          // Temporarily swap to ProductPage with autoOpenAddDialog
+          setState(() {
+            _pages[3] = ProductPage(autoOpenAddDialog: autoOpenAddDialog);
+            _selectedIndex = index;
+          });
+        } else if (index == 11) {
+          setState(() {
+            _pages[11] = UserManagementPage(
+              autoOpenAddDialog: autoOpenAddDialog,
+            );
+            _selectedIndex = index;
+          });
+        } else {
+          setState(() {
+            _selectedIndex = index;
+          });
+        }
+      },
     ),
     const SupplierPage(),
     const CategoryPage(),
@@ -78,89 +98,134 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: EdgeInsets.zero,
                     children: [
                       Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 10.0,
-                  ),
-                  width: double.infinity,
-                  child: const Text(
-                    textAlign: TextAlign.left,
-                    'MENU UTAMA',
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                _buildMenuItem(0, Icons.dashboard, "Dashboard"),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 10.0,
+                        ),
+                        width: double.infinity,
+                        child: const Text(
+                          textAlign: TextAlign.left,
+                          'MENU UTAMA',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(0, Icons.dashboard, "Dashboard"),
 
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 10.0,
-                  ),
-                  width: double.infinity,
-                  child: const Text(
-                    'MASTER DATA',
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                _buildMenuItem(1, Icons.local_shipping, "Master Supplier"),
-                _buildMenuItem(2, Icons.category, "Master Kategori"),
-                _buildMenuItem(5, Icons.straighten, "Master Satuan"),
-                _buildMenuItem(3, Icons.inventory, "Master Barang"),
-                _buildMenuItem(4, Icons.people, "Master Customer"),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 10.0,
+                        ),
+                        width: double.infinity,
+                        child: const Text(
+                          'MASTER DATA',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(
+                        1,
+                        Icons.local_shipping,
+                        "Master Supplier",
+                      ),
+                      _buildMenuItem(2, Icons.category, "Master Kategori"),
+                      _buildMenuItem(5, Icons.straighten, "Master Satuan"),
+                      _buildMenuItem(3, Icons.inventory, "Master Barang"),
+                      _buildMenuItem(4, Icons.people, "Master Customer"),
 
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 10.0,
-                  ),
-                  width: double.infinity,
-                  child: const Text(
-                    'PEMBELIAN',
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                _buildMenuItem(6, Icons.receipt_long, "Invoice Pembelian"),
-                _buildMenuItem(7, Icons.analytics, "Analisis Harga"),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 10.0,
+                        ),
+                        width: double.infinity,
+                        child: const Text(
+                          'PEMBELIAN',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(
+                        6,
+                        Icons.receipt_long,
+                        "Invoice Pembelian",
+                      ),
+                      _buildMenuItem(7, Icons.analytics, "Analisis Harga"),
 
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
-                  width: double.infinity,
-                  child: const Text('MONITORING', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-                _buildMenuItem(8, Icons.account_balance_wallet, "Hutang & Piutang"),
-                _buildMenuItem(9, Icons.history, "Kartu Stok"),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 10.0,
+                        ),
+                        width: double.infinity,
+                        child: const Text(
+                          'MONITORING',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(
+                        8,
+                        Icons.account_balance_wallet,
+                        "Hutang & Piutang",
+                      ),
+                      _buildMenuItem(9, Icons.history, "Kartu Stok"),
 
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
-                  width: double.infinity,
-                  child: const Text('ADMIN', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-                _buildMenuItem(10, Icons.bar_chart, "Laporan Analitik"),
-                _buildMenuItem(11, Icons.manage_accounts, "Manajemen Akun"),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 10.0,
+                        ),
+                        width: double.infinity,
+                        child: const Text(
+                          'ADMIN',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(10, Icons.bar_chart, "Laporan Analitik"),
+                      _buildMenuItem(
+                        11,
+                        Icons.manage_accounts,
+                        "Manajemen Akun",
+                      ),
                     ],
                   ),
                 ),
 
                 const Divider(color: AppColors.accent),
                 ListTile(
-                  leading: const Icon(Icons.point_of_sale, color: Colors.orange),
-                  title: const Text('Masuk Kasir', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                  leading: const Icon(
+                    Icons.point_of_sale,
+                    color: Colors.orange,
+                  ),
+                  title: const Text(
+                    'Masuk Kasir',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   onTap: () {
                     Get.toNamed(AppRoutes.pos);
                   },
@@ -223,6 +288,12 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         onTap: () {
           setState(() {
+            // Reset the autoOpenAddDialog flag if we navigate from drawer
+            if (index == 3) {
+              _pages[3] = const ProductPage(autoOpenAddDialog: false);
+            } else if (index == 11) {
+              _pages[11] = const UserManagementPage(autoOpenAddDialog: false);
+            }
             _selectedIndex = index;
           });
         },
