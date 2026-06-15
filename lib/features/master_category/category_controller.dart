@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:logger/logger.dart';
@@ -69,6 +70,48 @@ class CategoryController extends GetxController {
     } catch (e) {
       _logger.e("Error deleting category", error: e);
       Get.snackbar('Error', 'Gagal menghapus kategori.');
+    }
+  }
+
+  Future<void> showCategoryProducts(Category category) async {
+    try {
+      Database db = await _dbHelper.database;
+      var products = await db.rawQuery('''
+        SELECT name, stock
+        FROM products
+        WHERE category_id = ?
+      ''', [category.id]);
+
+      Get.dialog(
+        AlertDialog(
+          title: Text('Produk Kategori ${category.name}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: products.isEmpty
+                ? const Center(child: Text('Tidak ada produk dalam kategori ini.'))
+                : ListView.builder(
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      var p = products[index];
+                      return ListTile(
+                        leading: const Icon(Icons.inventory_2),
+                        title: Text(p['name'].toString()),
+                        trailing: Text('Stok: ${p['stock']}'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _logger.e("Error fetching products for category", error: e);
     }
   }
 }

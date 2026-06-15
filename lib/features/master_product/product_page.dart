@@ -11,6 +11,7 @@ import 'package:posapp_w6zxit6s/core/models/product.dart';
 import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
 import 'package:posapp_w6zxit6s/core/widgets/custom_dialog.dart';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
+import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
 
 class _TempProductUnit {
   int? unitId;
@@ -121,23 +122,38 @@ class _ProductPageState extends State<ProductPage> {
                       enabled: product == null,
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      value: selectedCategoryId,
-                      decoration: const InputDecoration(labelText: 'Kategori'),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('Tidak ada'),
-                        ),
-                        ..._controller.categories.map(
-                          (c) => DropdownMenuItem<int>(
-                            value: c.id,
-                            child: Text(c.name),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: selectedCategoryId,
+                            decoration: const InputDecoration(labelText: 'Kategori'),
+                            items: [
+                              const DropdownMenuItem<int>(
+                                value: null,
+                                child: Text('Tidak ada'),
+                              ),
+                              ..._controller.categories.map(
+                                (c) => DropdownMenuItem<int>(
+                                  value: c.id,
+                                  child: Text(c.name),
+                                ),
+                              ),
+                            ],
+                            onChanged: (val) =>
+                                setDialogState(() => selectedCategoryId = val),
                           ),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle, color: AppColors.primary),
+                          onPressed: () async {
+                            await Get.toNamed(AppRoutes.masterCategory);
+                            await _controller.fetchDependencies();
+                            setDialogState(() {});
+                          },
+                        ),
                       ],
-                      onChanged: (val) =>
-                          setDialogState(() => selectedCategoryId = val),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -160,6 +176,14 @@ class _ProductPageState extends State<ProductPage> {
                             onChanged: (val) =>
                                 setDialogState(() => selectedUnitId = val),
                           ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle, color: AppColors.primary),
+                          onPressed: () async {
+                            await Get.toNamed(AppRoutes.masterUnit);
+                            await _controller.fetchDependencies();
+                            setDialogState(() {});
+                          },
                         ),
                         const SizedBox(width: 12),
                         Tooltip(
@@ -322,13 +346,27 @@ class _ProductPageState extends State<ProductPage> {
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Pilih Supplier',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Pilih Supplier',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await Get.toNamed(AppRoutes.masterSupplier);
+                            await _controller.fetchDependencies();
+                            setDialogState(() {});
+                          },
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Tambah Supplier', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -578,7 +616,28 @@ class _ProductPageState extends State<ProductPage> {
               }
 
               return Card(
-                child: ListView.separated(
+                child: Column(
+                  children: [
+                    // Table Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Expanded(flex: 2, child: Text('Barcode/SKU', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 3, child: Text('Nama Barang', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Stok', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Harga Jual', style: TextStyle(fontWeight: FontWeight.bold))),
+                          SizedBox(width: 80, child: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.separated(
                   controller: _scrollController,
                   itemCount:
                       _controller.products.length +
@@ -596,107 +655,86 @@ class _ProductPageState extends State<ProductPage> {
                     }
 
                     final p = _controller.products[index];
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      title: Text(
-                        p.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                "SKU: ${p.barcode}",
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  p.categoryName ?? 'Tanpa Kategori',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ],
+                          Expanded(
+                            flex: 2,
+                            child: Text(p.barcode, style: const TextStyle(fontWeight: FontWeight.w500)),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Harga: Rp ${p.sellPrice} | Stok: ${p.stock} ${p.unitName ?? '-'} (Min: ${p.minStock})",
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          if (p.supplierNames != null &&
-                              p.supplierNames!.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              "Supplier: ${p.supplierNames}",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit,
-                              color: AppColors.primary,
-                            ),
-                            onPressed: () => _showFormDialog(product: p),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete,
-                              color: AppColors.error,
-                            ),
-                            onPressed: () {
-                              Get.dialog(
-                                CustomDialog(
-                                  title: 'Hapus Barang',
-                                  content: Text(
-                                    'Apakah Anda yakin ingin menghapus ${p.name}?',
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                if (p.supplierNames != null && p.supplierNames!.isNotEmpty)
+                                  Text(
+                                    "Sup: ${p.supplierNames}",
+                                    style: const TextStyle(fontSize: 11, color: AppColors.secondary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  confirmText: 'Hapus',
-                                  isDestructive: true,
-                                  onCancel: () => Get.back(),
-                                  onConfirm: () {
-                                    _controller.deleteProduct(p.id!);
-                                    Get.back();
-                                  },
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(p.categoryName ?? '-'),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('${p.stock} ${p.unitName ?? '-'}'),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('Rp ${p.sellPrice}'),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: AppColors.primary, size: 18),
+                                  onPressed: () => _showFormDialog(product: p),
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
                                 ),
-                              );
-                            },
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: AppColors.error, size: 18),
+                                  onPressed: () {
+                                    Get.dialog(
+                                      CustomDialog(
+                                        title: 'Hapus Barang',
+                                        content: Text('Apakah Anda yakin ingin menghapus ${p.name}?'),
+                                        confirmText: 'Hapus',
+                                        isDestructive: true,
+                                        onCancel: () => Get.back(),
+                                        onConfirm: () {
+                                          _controller.deleteProduct(p.id!);
+                                          Get.back();
+                                        },
+                                      ),
+                                    );
+                                  },
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     );
                   },
                 ),
-              );
+              ),
+            ],
+          ),
+        );
             }),
           ),
         ],

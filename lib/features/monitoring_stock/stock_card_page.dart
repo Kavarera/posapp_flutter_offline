@@ -38,31 +38,56 @@ class StockCardPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Obx(
-                    () => DropdownButtonFormField<int>(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                      ),
-                      value: _controller.selectedProductId.value,
-                      items: _controller.products
-                          .map(
-                            (p) => DropdownMenuItem<int>(
-                              value: p['id'] as int,
-                              child: Text(
-                                '${p['barcode']} - ${p['name']} (Stok: ${p['stock']})',
-                              ),
+                  child: Obx(() {
+                    if (_controller.products.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return Autocomplete<Map<String, dynamic>>(
+                      displayStringForOption: (option) =>
+                          '${option['barcode']} - ${option['name']} (Stok: ${option['stock']})',
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<Map<String, dynamic>>.empty();
+                        }
+                        return _controller.products.where((option) {
+                          final query = textEditingValue.text.toLowerCase();
+                          return option['name']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(query) ||
+                              option['barcode']
+                                  .toString()
+                                  .toLowerCase()
+                                  .contains(query);
+                        });
+                      },
+                      onSelected: (Map<String, dynamic> selection) {
+                        _controller.onProductChanged(selection['id'] as int);
+                      },
+                      fieldViewBuilder: (
+                        context,
+                        textEditingController,
+                        focusNode,
+                        onFieldSubmitted,
+                      ) {
+                        return TextField(
+                          controller: textEditingController,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            labelText: 'Cari Barang (Nama/SKU)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          )
-                          .toList(),
-                      onChanged: _controller.onProductChanged,
-                    ),
-                  ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            prefixIcon: const Icon(Icons.search),
+                          ),
+                        );
+                      },
+                    );
+                  }),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton.icon(

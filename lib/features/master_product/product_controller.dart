@@ -264,6 +264,7 @@ class ProductController extends GetxController {
     try {
       String csv = CsvHelper.generateCsvTemplate();
       File file = File(path);
+      file.parent.createSync(recursive: true);
       await file.writeAsString(csv);
       SnackbarHelper.show(
         'Sukses',

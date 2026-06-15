@@ -72,12 +72,12 @@ class UserManagementController extends GetxController {
         'is_active': 1,
       });
 
+      Get.back(); // close dialog
       SnackbarHelper.show(
         'Sukses',
         'Pengguna berhasil ditambahkan.',
         isError: false,
       );
-      Get.back(); // close dialog
       loadUsers();
     } catch (e) {
       _logger.e("Error adding user", error: e);
@@ -131,12 +131,12 @@ class UserManagementController extends GetxController {
         whereArgs: [id],
       );
 
+      Get.back();
       SnackbarHelper.show(
         'Sukses',
         'Password berhasil direset.',
         isError: false,
       );
-      Get.back();
     } catch (e) {
       _logger.e("Error resetting password", error: e);
       SnackbarHelper.show('Error', 'Gagal mereset password.', isError: true);

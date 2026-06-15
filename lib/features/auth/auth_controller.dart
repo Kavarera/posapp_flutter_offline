@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 
 import 'package:posapp_w6zxit6s/core/database/database_helper.dart';
 import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:posapp_w6zxit6s/core/services/session_service.dart';
 
 class AuthController extends GetxController {
@@ -36,6 +37,7 @@ class AuthController extends GetxController {
       if (token != null && role != null) {
         Get.find<SessionService>().setSession(token, role);
         _logger.i("Existing session found. Redirecting...");
+        await windowManager.setFullScreen(true);
         if (role == 'Kasir') {
           Get.offAllNamed(AppRoutes.pos);
         } else {
@@ -88,6 +90,7 @@ class AuthController extends GetxController {
         Get.find<SessionService>().setSession(user['id'].toString(), user['role'].toString());
         
         _logger.i("User $username logged in successfully.");
+        await windowManager.setFullScreen(true);
         if (user['role'] == 'Kasir') {
           Get.offAllNamed(AppRoutes.pos);
         } else {
@@ -110,6 +113,7 @@ class AuthController extends GetxController {
     await _secureStorage.delete(key: 'session_token');
     await _secureStorage.delete(key: 'session_role');
     Get.find<SessionService>().clearSession();
+    await windowManager.setFullScreen(false);
     Get.offAllNamed(AppRoutes.login);
   }
 }

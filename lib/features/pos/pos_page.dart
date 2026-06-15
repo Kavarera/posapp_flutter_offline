@@ -139,9 +139,23 @@ class PosPage extends StatelessWidget {
                         itemCount: _controller.cartItems.length,
                         itemBuilder: (context, index) {
                           final item = _controller.cartItems[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(item['product_name']),
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              title: Text(item['product_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Row(
                               children: [
                                 IconButton(
@@ -233,7 +247,8 @@ class PosPage extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          );
+                          ),
+                        );
                         },
                       ),
                     ),

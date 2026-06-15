@@ -236,6 +236,8 @@ class DashboardController extends GetxController {
 
       if (outputFile == null) return; // User canceled
 
+      File(outputFile).parent.createSync(recursive: true);
+
       SnackbarHelper.show('Info', 'Proses ekspor data dimulai...');
 
       var encoder = ZipFileEncoder();

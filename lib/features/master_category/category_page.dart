@@ -31,7 +31,10 @@ class _CategoryPageState extends State<CategoryPage> {
             if (category == null) {
               _controller.addCategory(nameController.text.trim());
             } else {
-              _controller.updateCategory(category.id!, nameController.text.trim());
+              _controller.updateCategory(
+                category.id!,
+                nameController.text.trim(),
+              );
             }
             Get.back();
           }
@@ -83,76 +86,107 @@ class _CategoryPageState extends State<CategoryPage> {
                 itemBuilder: (context, index) {
                   final cat = _controller.categories[index];
                   return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  cat.name,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: AppColors.primary, size: 20),
-                                    onPressed: () => _showFormDialog(category: cat),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: AppColors.error, size: 20),
-                                    onPressed: () {
-                                      Get.dialog(
-                                        CustomDialog(
-                                          title: 'Hapus Kategori',
-                                          content: const Text('Apakah Anda yakin ingin menghapus kategori ini?'),
-                                          confirmText: 'Hapus',
-                                          isDestructive: true,
-                                          onCancel: () => Get.back(),
-                                          onConfirm: () {
-                                            _controller.deleteCategory(cat.id!);
-                                            Get.back();
-                                          },
-                                        ),
-                                      );
-                                    },
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.background.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                    child: InkWell(
+                      onTap: () => _controller.showCategoryProducts(cat),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.primary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${cat.productCount} Barang',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                                Expanded(
+                                  child: Text(
+                                    '#${cat.id} - ${cat.name}',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: AppColors.primary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showFormDialog(category: cat),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: AppColors.error,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        Get.dialog(
+                                          CustomDialog(
+                                            title: 'Hapus Kategori',
+                                            content: const Text(
+                                              'Apakah Anda yakin ingin menghapus kategori ini?',
+                                            ),
+                                            confirmText: 'Hapus',
+                                            isDestructive: true,
+                                            onCancel: () => Get.back(),
+                                            onConfirm: () {
+                                              _controller.deleteCategory(
+                                                cat.id!,
+                                              );
+                                              Get.back();
+                                            },
+                                          ),
+                                        );
+                                      },
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.background.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${cat.productCount} Barang',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
