@@ -14,6 +14,9 @@ class PurchaseInvoice {
   final List<String> documentPaths;
   final String createdAt;
   
+  // Transient properties from JOINs
+  final String? supplierName;
+
   // Relations
   final List<PurchaseInvoiceDetail> details;
 
@@ -30,6 +33,7 @@ class PurchaseInvoice {
     this.status = 'Belum Lunas',
     this.documentPaths = const [],
     required this.createdAt,
+    this.supplierName,
     this.details = const [],
   });
 
@@ -56,6 +60,7 @@ class PurchaseInvoice {
       status: json['status'] as String? ?? 'Belum Lunas',
       documentPaths: docs,
       createdAt: json['created_at'] as String,
+      supplierName: json['supplier_name'] as String?,
     );
   }
 
@@ -90,6 +95,10 @@ class PurchaseInvoiceDetail {
   final double totalPrice;
   final double baseUnitPrice;
 
+  // Transient fields
+  final String? productName;
+  final String? unitName;
+
   PurchaseInvoiceDetail({
     this.id,
     required this.invoiceId,
@@ -99,6 +108,8 @@ class PurchaseInvoiceDetail {
     required this.unitPrice,
     required this.totalPrice,
     required this.baseUnitPrice,
+    this.productName,
+    this.unitName,
   });
 
   factory PurchaseInvoiceDetail.fromJson(Map<String, dynamic> json) {
@@ -111,6 +122,8 @@ class PurchaseInvoiceDetail {
       unitPrice: (json['unit_price'] as num).toDouble(),
       totalPrice: (json['total_price'] as num).toDouble(),
       baseUnitPrice: (json['base_unit_price'] as num).toDouble(),
+      productName: json['product_name'] as String?,
+      unitName: json['unit_name'] as String?,
     );
   }
 

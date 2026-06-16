@@ -28,20 +28,24 @@ class PurchaseInvoiceController extends GetxController {
     isLoading.value = true;
     try {
       final db = await _dbHelper.database;
-      final maps = await db.query(
-        'purchase_invoices',
-        orderBy: 'created_at DESC',
-      );
+      final maps = await db.rawQuery('''
+        SELECT pi.*, s.name as supplier_name 
+        FROM purchase_invoices pi
+        LEFT JOIN suppliers s ON pi.supplier_id = s.id
+        ORDER BY pi.created_at DESC
+      ''');
 
       List<PurchaseInvoice> list = [];
       for (var map in maps) {
         var invoice = PurchaseInvoice.fromJson(map);
         // Fetch details
-        final detailMaps = await db.query(
-          'purchase_invoice_details',
-          where: 'invoice_id = ?',
-          whereArgs: [invoice.id],
-        );
+        final detailMaps = await db.rawQuery('''
+          SELECT d.*, p.name as product_name, u.name as unit_name
+          FROM purchase_invoice_details d
+          LEFT JOIN products p ON d.product_id = p.id
+          LEFT JOIN units u ON d.unit_id = u.id
+          WHERE d.invoice_id = ?
+        ''', [invoice.id]);
         var details = detailMaps
             .map((d) => PurchaseInvoiceDetail.fromJson(d))
             .toList();
@@ -57,6 +61,7 @@ class PurchaseInvoiceController extends GetxController {
             totalNominal: invoice.totalNominal,
             documentPaths: invoice.documentPaths,
             createdAt: invoice.createdAt,
+            supplierName: invoice.supplierName,
             details: details,
           ),
         );

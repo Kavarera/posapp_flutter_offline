@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/features/auth/auth_controller.dart';
 import 'package:posapp_w6zxit6s/features/master_category/category_page.dart';
@@ -27,6 +28,18 @@ class _DashboardPageState extends State<DashboardPage> {
   final AuthController _authController = Get.find<AuthController>();
 
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupWindow();
+  }
+
+  Future<void> _setupWindow() async {
+    await windowManager.setFullScreen(true);
+    await windowManager.setResizable(false);
+    await windowManager.setMinimizable(false);
+  }
 
   // Placeholder pages for Master Data
   late final List<Widget> _pages = [

@@ -17,6 +17,20 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _setupWindow();
+  }
+
+  Future<void> _setupWindow() async {
+    await windowManager.setFullScreen(false);
+    await windowManager.setResizable(true);
+    await windowManager.setMinimizable(true);
+    await windowManager.setSize(const Size(1024, 768));
+    await windowManager.center();
+  }
+
+  @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();

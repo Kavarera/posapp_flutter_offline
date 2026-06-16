@@ -631,6 +631,7 @@ class _ProductPageState extends State<ProductPage> {
                           Expanded(flex: 3, child: Text('Nama Barang', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Stok', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Min. Stok', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Harga Jual', style: TextStyle(fontWeight: FontWeight.bold))),
                           SizedBox(width: 80, child: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                         ],
@@ -686,7 +687,17 @@ class _ProductPageState extends State<ProductPage> {
                           ),
                           Expanded(
                             flex: 2,
-                            child: Text('${p.stock} ${p.unitName ?? '-'}'),
+                            child: Text(
+                              '${p.stock} ${p.unitName ?? '-'}',
+                              style: TextStyle(
+                                color: p.stock <= p.minStock ? Colors.red : null,
+                                fontWeight: p.stock <= p.minStock ? FontWeight.bold : null,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('${p.minStock} ${p.unitName ?? '-'}'),
                           ),
                           Expanded(
                             flex: 2,
