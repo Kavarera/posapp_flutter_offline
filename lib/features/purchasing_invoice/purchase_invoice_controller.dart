@@ -27,13 +27,19 @@ class PurchaseInvoiceController extends GetxController {
 
   // Summaries
   int get totalInvoicesCount => invoices.length;
-  double get totalInvoicesAmount => invoices.fold(0, (sum, item) => sum + item.totalNominal);
+  double get totalInvoicesAmount =>
+      invoices.fold(0, (sum, item) => sum + item.totalNominal);
 
   int get totalLunasCount => invoices.where((i) => i.status == 'Lunas').length;
-  double get totalLunasAmount => invoices.where((i) => i.status == 'Lunas').fold(0, (sum, item) => sum + item.totalNominal);
+  double get totalLunasAmount => invoices
+      .where((i) => i.status == 'Lunas')
+      .fold(0, (sum, item) => sum + item.totalNominal);
 
-  int get totalBelumLunasCount => invoices.where((i) => i.status == 'Belum Lunas').length;
-  double get totalBelumLunasAmount => invoices.where((i) => i.status == 'Belum Lunas').fold(0, (sum, item) => sum + item.totalNominal);
+  int get totalBelumLunasCount =>
+      invoices.where((i) => i.status == 'Belum Lunas').length;
+  double get totalBelumLunasAmount => invoices
+      .where((i) => i.status == 'Belum Lunas')
+      .fold(0, (sum, item) => sum + item.totalNominal);
 
   @override
   void onInit() {
@@ -84,15 +90,25 @@ class PurchaseInvoiceController extends GetxController {
       if (selectedSupplierId.value != null) {
         conditions.add('pi.supplier_id = ${selectedSupplierId.value}');
       }
-      
-      String whereClause = conditions.isNotEmpty ? 'WHERE ${conditions.join(' AND ')}' : '';
+
+      conditions.add('EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id AND pid.qty > 0)');
+
+      String whereClause = conditions.isNotEmpty
+          ? 'WHERE ${conditions.join(' AND ')}'
+          : '';
 
       String sortField = 'pi.created_at';
       switch (sortBy.value) {
-        case 'total_nominal': sortField = 'pi.total_nominal'; break;
-        case 'due_date': sortField = 'pi.due_date'; break;
+        case 'total_nominal':
+          sortField = 'pi.total_nominal';
+          break;
+        case 'due_date':
+          sortField = 'pi.due_date';
+          break;
         case 'created_at':
-        default: sortField = 'pi.created_at'; break;
+        default:
+          sortField = 'pi.created_at';
+          break;
       }
       String sortOrder = sortAscending.value ? 'ASC' : 'DESC';
 
@@ -108,13 +124,16 @@ class PurchaseInvoiceController extends GetxController {
       for (var map in maps) {
         var invoice = PurchaseInvoice.fromJson(map);
         // Fetch details
-        final detailMaps = await db.rawQuery('''
+        final detailMaps = await db.rawQuery(
+          '''
           SELECT d.*, p.name as product_name, u.name as unit_name
           FROM purchase_invoice_details d
           LEFT JOIN products p ON d.product_id = p.id
           LEFT JOIN units u ON d.unit_id = u.id
           WHERE d.invoice_id = ?
-        ''', [invoice.id]);
+        ''',
+          [invoice.id],
+        );
         var details = detailMaps
             .map((d) => PurchaseInvoiceDetail.fromJson(d))
             .toList();
@@ -279,7 +298,9 @@ class PurchaseInvoiceController extends GetxController {
           dueDate: invoice.dueDate,
           paymentMethod: invoice.paymentMethod,
           totalNominal: invoice.totalNominal,
-          paidAmount: invoice.paymentMethod == 'Tunai' ? invoice.totalNominal : 0.0,
+          paidAmount: invoice.paymentMethod == 'Tunai'
+              ? invoice.totalNominal
+              : 0.0,
           status: invoice.paymentMethod == 'Tunai' ? 'Lunas' : 'Belum Lunas',
           documentPaths: permanentPaths,
           createdAt: DateTime.now().toIso8601String(),
