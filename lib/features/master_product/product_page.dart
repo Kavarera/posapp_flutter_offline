@@ -578,12 +578,65 @@ class _ProductPageState extends State<ProductPage> {
             ],
           ),
           const SizedBox(height: 24),
-          TextField(
-            decoration: const InputDecoration(
-              labelText: 'Cari Nama / Barcode...',
-              prefixIcon: Icon(Icons.search),
-            ),
-            onChanged: _controller.onSearchChanged,
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Cari Nama / Barcode...',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: _controller.onSearchChanged,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(() => DropdownButtonFormField<int?>(
+                  decoration: const InputDecoration(labelText: 'Kategori'),
+                  value: _controller.selectedCategoryId.value,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Semua Kategori')),
+                    ..._controller.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                  ],
+                  onChanged: (val) => _controller.applyFilter(categoryId: val, supplierId: _controller.selectedSupplierId.value),
+                )),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(() => DropdownButtonFormField<int?>(
+                  decoration: const InputDecoration(labelText: 'Supplier'),
+                  value: _controller.selectedSupplierId.value,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Semua Supplier')),
+                    ..._controller.suppliers.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
+                  ],
+                  onChanged: (val) => _controller.applyFilter(categoryId: _controller.selectedCategoryId.value, supplierId: val),
+                )),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(() => DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Urutkan'),
+                  value: _controller.sortBy.value,
+                  items: const [
+                    DropdownMenuItem(value: 'name', child: Text('Nama Barang')),
+                    DropdownMenuItem(value: 'stock', child: Text('Stok')),
+                    DropdownMenuItem(value: 'barcode', child: Text('SKU / Barcode')),
+                    DropdownMenuItem(value: 'min_stock', child: Text('Min. Stok')),
+                    DropdownMenuItem(value: 'buy_price', child: Text('Harga Beli')),
+                    DropdownMenuItem(value: 'sell_price', child: Text('Harga Jual')),
+                  ],
+                  onChanged: (val) => _controller.applySort(val ?? 'name'),
+                )),
+              ),
+              const SizedBox(width: 8),
+              Obx(() => IconButton(
+                icon: Icon(_controller.sortAscending.value ? Icons.arrow_upward : Icons.arrow_downward),
+                onPressed: () => _controller.toggleSortDirection(),
+                tooltip: _controller.sortAscending.value ? 'Menaik (Ascending)' : 'Menurun (Descending)',
+              )),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -632,6 +685,7 @@ class _ProductPageState extends State<ProductPage> {
                           Expanded(flex: 2, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Stok', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Min. Stok', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Harga Beli', style: TextStyle(fontWeight: FontWeight.bold))),
                           Expanded(flex: 2, child: Text('Harga Jual', style: TextStyle(fontWeight: FontWeight.bold))),
                           SizedBox(width: 80, child: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                         ],
@@ -698,6 +752,10 @@ class _ProductPageState extends State<ProductPage> {
                           Expanded(
                             flex: 2,
                             child: Text('${p.minStock} ${p.unitName ?? '-'}'),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('Rp ${p.buyPrice}'),
                           ),
                           Expanded(
                             flex: 2,

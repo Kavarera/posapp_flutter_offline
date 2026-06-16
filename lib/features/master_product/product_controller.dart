@@ -30,9 +30,15 @@ class ProductController extends GetxController {
   var offset = 0;
   var hasMoreData = true.obs;
 
-  // Search
+  // Search & Filter
   var searchQuery = ''.obs;
+  var selectedCategoryId = Rxn<int>();
+  var selectedSupplierId = Rxn<int>();
   Timer? _debounce;
+
+  // Sorting
+  var sortBy = 'name'.obs; // name, stock, barcode, min_stock, buy_price, sell_price
+  var sortAscending = true.obs;
 
   @override
   void onInit() {
@@ -77,6 +83,36 @@ class ProductController extends GetxController {
     });
   }
 
+  void applyFilter({int? categoryId, int? supplierId}) {
+    selectedCategoryId.value = categoryId;
+    selectedSupplierId.value = supplierId;
+    offset = 0;
+    products.clear();
+    hasMoreData.value = true;
+    fetchProducts();
+  }
+
+  void toggleSortDirection() {
+    sortAscending.value = !sortAscending.value;
+    offset = 0;
+    products.clear();
+    hasMoreData.value = true;
+    fetchProducts();
+  }
+
+  void applySort(String field) {
+    if (sortBy.value == field) {
+      sortAscending.value = !sortAscending.value;
+    } else {
+      sortBy.value = field;
+      sortAscending.value = true;
+    }
+    offset = 0;
+    products.clear();
+    hasMoreData.value = true;
+    fetchProducts();
+  }
+
   Future<void> fetchProducts({bool loadMore = false}) async {
     if (isLoading.value || !hasMoreData.value && loadMore) return;
 
@@ -84,11 +120,30 @@ class ProductController extends GetxController {
       isLoading.value = true;
       Database db = await _dbHelper.database;
 
-      String searchCondition = '';
+      List<String> conditions = [];
       if (searchQuery.value.isNotEmpty) {
-        searchCondition =
-            'WHERE p.name LIKE "%${searchQuery.value}%" OR p.barcode LIKE "%${searchQuery.value}%"';
+        conditions.add('(p.name LIKE "%${searchQuery.value}%" OR p.barcode LIKE "%${searchQuery.value}%")');
       }
+      if (selectedCategoryId.value != null) {
+        conditions.add('p.category_id = ${selectedCategoryId.value}');
+      }
+      if (selectedSupplierId.value != null) {
+        conditions.add('ps.supplier_id = ${selectedSupplierId.value}');
+      }
+      
+      String whereClause = conditions.isNotEmpty ? 'WHERE ${conditions.join(' AND ')}' : '';
+
+      String sortField = 'p.name';
+      switch (sortBy.value) {
+        case 'stock': sortField = 'p.stock'; break;
+        case 'barcode': sortField = 'p.barcode'; break;
+        case 'min_stock': sortField = 'p.min_stock'; break;
+        case 'buy_price': sortField = 'p.buy_price'; break;
+        case 'sell_price': sortField = 'p.sell_price'; break;
+        case 'name':
+        default: sortField = 'p.name'; break;
+      }
+      String sortOrder = sortAscending.value ? 'ASC' : 'DESC';
 
       final List<Map<String, dynamic>> maps = await db.rawQuery('''
         SELECT p.*, 
@@ -100,8 +155,9 @@ class ProductController extends GetxController {
         LEFT JOIN units u ON p.unit_id = u.id
         LEFT JOIN product_suppliers ps ON p.id = ps.product_id
         LEFT JOIN suppliers s ON ps.supplier_id = s.id
-        $searchCondition
+        $whereClause
         GROUP BY p.id
+        ORDER BY $sortField $sortOrder
         LIMIT $limit OFFSET $offset
       ''');
 
