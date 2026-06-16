@@ -1,10 +1,22 @@
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:logger/logger.dart';
 import 'package:posapp_w6zxit6s/core/database/database_helper.dart';
-import 'package:posapp_w6zxit6s/core/models/supplier.dart';
 import 'package:posapp_w6zxit6s/core/models/product.dart';
-import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
+import 'package:posapp_w6zxit6s/core/models/supplier.dart';
+
+class PriceHistoryItem {
+  final String supplierName;
+  final double baseUnitPrice;
+  final String invoiceDate;
+  final double percentageDiff;
+
+  PriceHistoryItem({
+    required this.supplierName,
+    required this.baseUnitPrice,
+    required this.invoiceDate,
+    required this.percentageDiff,
+  });
+}
 
 class PriceAnalysisController extends GetxController {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -12,297 +24,211 @@ class PriceAnalysisController extends GetxController {
 
   var isLoading = false.obs;
 
-  // Filters
-  var startDate = DateTime.now().subtract(const Duration(days: 90)).obs;
-  var endDate = DateTime.now().obs;
+  // Search state
+  var searchQuery = ''.obs;
+  var searchResults = <Product>[].obs;
+  var selectedProduct = Rxn<Product>();
 
-  var allSuppliers = <Supplier>[].obs;
-  var selectedSupplierIds = <int>[].obs;
+  // Filter state
+  var selectedMonth = Rxn<int>();
+  var selectedYear = Rxn<int>();
 
-  var analysisType = 'Barang'.obs; // 'Barang' atau 'Kategori'
+  // Output
+  var priceHistory = <PriceHistoryItem>[].obs;
 
-  var allProducts = <Product>[].obs;
-  var selectedProductIds = <int>[].obs;
+  // Suppliers for Add Price Dialog
+  var productSuppliers = <Supplier>[].obs;
 
-  var allCategories = <Map<String, dynamic>>[].obs;
-  var selectedCategoryIds = <int>[].obs;
-
-  // Outputs
-  var recommendedPrices = <Map<String, dynamic>>[].obs;
-  var lineChartData = <Map<String, dynamic>>[].obs;
-  var barChartData = <Map<String, dynamic>>[].obs;
+  PriceHistoryItem? get cheapestHistoryItem {
+    if (priceHistory.isEmpty) return null;
+    try {
+      return priceHistory.firstWhere((item) => item.percentageDiff == 0);
+    } catch (e) {
+      return null;
+    }
+  }
 
   @override
   void onInit() {
     super.onInit();
-    _loadFilters();
+    // Watch search query changes to auto-search
+    debounce(searchQuery, (String query) {
+      if (query.isNotEmpty) {
+        searchProducts(query);
+      } else {
+        searchResults.clear();
+      }
+    }, time: const Duration(milliseconds: 300));
   }
 
-  Future<void> _loadFilters() async {
+  Future<void> loadProductSuppliers(int productId) async {
     try {
       final db = await _dbHelper.database;
-
-      final sMaps = await db.query('suppliers', orderBy: 'name ASC');
-      allSuppliers.assignAll(sMaps.map((e) => Supplier.fromJson(e)).toList());
-
-      final pMaps = await db.query('products', orderBy: 'name ASC');
-      allProducts.assignAll(pMaps.map((e) => Product.fromJson(e)).toList());
-
-      final cMaps = await db.query('categories', orderBy: 'name ASC');
-      allCategories.assignAll(cMaps);
+      final maps = await db.rawQuery('''
+        SELECT s.* 
+        FROM suppliers s
+        JOIN product_suppliers ps ON s.id = ps.supplier_id
+        WHERE ps.product_id = ?
+        ORDER BY s.name ASC
+      ''', [productId]);
+      productSuppliers.assignAll(maps.map((e) => Supplier.fromJson(e)).toList());
     } catch (e) {
-      _logger.e('Failed to load filters', error: e);
+      _logger.e('Failed to load product suppliers', error: e);
     }
   }
 
-  void toggleSupplier(int id) {
-    if (selectedSupplierIds.contains(id)) {
-      selectedSupplierIds.remove(id);
-    } else {
-      if (selectedSupplierIds.length >= 5) {
-        SnackbarHelper.show(
-          'Validasi',
-          'Maksimal 5 Supplier dapat dipilih',
-          isError: true,
-        );
-        return;
-      }
-      selectedSupplierIds.add(id);
+  Future<void> searchProducts(String query) async {
+    try {
+      final db = await _dbHelper.database;
+      final maps = await db.query(
+        'products',
+        where: 'name LIKE ? OR barcode LIKE ?',
+        whereArgs: ['%$query%', '%$query%'],
+        limit: 10,
+      );
+      searchResults.value = maps.map((e) => Product.fromJson(e)).toList();
+    } catch (e) {
+      _logger.e('Failed to search products', error: e);
     }
   }
 
-  void toggleProduct(int id) {
-    if (selectedProductIds.contains(id)) {
-      selectedProductIds.remove(id);
-    } else {
-      selectedProductIds.add(id);
+  void selectProduct(Product product) {
+    selectedProduct.value = product;
+    searchQuery.value = '';
+    searchResults.clear();
+    fetchPriceHistory(product.id!);
+    loadProductSuppliers(product.id!);
+  }
+
+  void clearSelection() {
+    selectedProduct.value = null;
+    priceHistory.clear();
+    searchQuery.value = '';
+    searchResults.clear();
+  }
+
+  void applyFilter({int? month, int? year}) {
+    selectedMonth.value = month;
+    selectedYear.value = year;
+    if (selectedProduct.value != null) {
+      fetchPriceHistory(selectedProduct.value!.id!);
     }
   }
 
-  void toggleCategory(int id) {
-    if (selectedCategoryIds.contains(id)) {
-      selectedCategoryIds.remove(id);
-    } else {
-      selectedCategoryIds.add(id);
-    }
-  }
-
-  Future<void> runAnalysis() async {
-    // We don't strictly require items to be selected if we default to all.
-    // Wait, the FRD says "Namun pada kondisi awal akan menampilkan tren harga untuk semua barang dan supplier."
-    // So if no product/category selected, we don't block. But it might be too much data.
-    // We will allow empty selection to mean "All".
-
+  Future<void> fetchPriceHistory(int productId) async {
     isLoading.value = true;
     try {
       final db = await _dbHelper.database;
 
-      bool filterSupplier = selectedSupplierIds.isNotEmpty;
-      String sIds = selectedSupplierIds.join(',');
+      List<String> conditions = ['pid.product_id = ?'];
+      List<dynamic> args = [productId];
 
-      bool filterProduct = selectedProductIds.isNotEmpty;
-      String pIds = selectedProductIds.join(',');
-
-      bool filterCategory = selectedCategoryIds.isNotEmpty;
-      String cIds = selectedCategoryIds.join(',');
-
-      String startIso = startDate.value.toIso8601String();
-      String endIso = endDate.value.toIso8601String();
-
-      // 1. Rekomendasi Harga Jual Terbaru
-      String queryRec = '''
-        SELECT p.id as product_id, p.name as product_name, d.base_unit_price, i.invoice_date
-        FROM purchase_invoice_details d
-        JOIN purchase_invoices i ON d.invoice_id = i.id
-        JOIN products p ON d.product_id = p.id
-        WHERE 1=1
-      ''';
-
-      if (filterSupplier) queryRec += ' AND i.supplier_id IN ($sIds)';
-      if (analysisType.value == 'Barang' && filterProduct) {
-        queryRec += ' AND p.id IN ($pIds)';
-      } else if (analysisType.value == 'Kategori' && filterCategory) {
-        queryRec += ' AND p.category_id IN ($cIds)';
+      if (selectedMonth.value != null) {
+        conditions.add("strftime('%m', pi.invoice_date) = ?");
+        args.add(selectedMonth.value.toString().padLeft(2, '0'));
       }
-      queryRec += ' ORDER BY i.invoice_date DESC';
+      if (selectedYear.value != null) {
+        conditions.add("strftime('%Y', pi.invoice_date) = ?");
+        args.add(selectedYear.value.toString());
+      }
 
-      final rawRec = await db.rawQuery(queryRec);
-      final processedRec = await compute(_processRecommendations, rawRec);
-      recommendedPrices.assignAll(processedRec);
+      String whereClause = conditions.join(' AND ');
 
-      // 2. Line Chart (Tren Harga)
-      String queryLine = '''
+      final maps = await db.rawQuery('''
         SELECT 
-          i.invoice_date, 
-          s.name as supplier_name, 
-          p.name as product_name, 
-          d.base_unit_price
-        FROM purchase_invoice_details d
-        JOIN purchase_invoices i ON d.invoice_id = i.id
-        JOIN products p ON d.product_id = p.id
-        JOIN suppliers s ON i.supplier_id = s.id
-        WHERE i.invoice_date >= ? AND i.invoice_date <= ?
-      ''';
+          s.name as supplier_name,
+          pid.base_unit_price,
+          pi.invoice_date
+        FROM purchase_invoice_details pid
+        JOIN purchase_invoices pi ON pid.invoice_id = pi.id
+        LEFT JOIN suppliers s ON pi.supplier_id = s.id
+        WHERE $whereClause
+        ORDER BY pi.invoice_date DESC
+      ''', args);
 
-      if (filterSupplier) queryLine += ' AND i.supplier_id IN ($sIds)';
-      if (analysisType.value == 'Barang' && filterProduct) {
-        queryLine += ' AND p.id IN ($pIds)';
-      } else if (analysisType.value == 'Kategori' && filterCategory) {
-        queryLine += ' AND p.category_id IN ($cIds)';
+      if (maps.isEmpty) {
+        priceHistory.clear();
+        return;
       }
-      queryLine += ' ORDER BY i.invoice_date ASC';
 
-      final rawLine = await db.rawQuery(queryLine, [startIso, endIso]);
-      final processedLine = await compute(_processLineChart, rawLine);
-      lineChartData.assignAll(processedLine);
+      // Find the cheapest base_unit_price
+      double cheapest = double.infinity;
+      for (var map in maps) {
+        final price = (map['base_unit_price'] as num?)?.toDouble() ?? 0;
+        if (price > 0 && price < cheapest) {
+          cheapest = price;
+        }
+      }
 
-      // 3. Bar Chart (Perbandingan Harga)
-      // Only for products with >1 supplier in product_suppliers.
-      // So we fetch all products that qualify first.
-      String qualifyingProductsQuery = '''
-        SELECT product_id 
-        FROM product_suppliers 
-        GROUP BY product_id 
-        HAVING COUNT(supplier_id) > 1
-      ''';
-      final multiSuppProducts = await db.rawQuery(qualifyingProductsQuery);
-      List<int> validPids = multiSuppProducts
-          .map((e) => e['product_id'] as int)
-          .toList();
-
-      if (validPids.isEmpty) {
-        barChartData.assignAll([]);
-      } else {
-        String validPidsStr = validPids.join(',');
-        String queryBar =
-            '''
-          SELECT 
-            p.name as product_name, 
-            s.name as supplier_name, 
-            d.base_unit_price
-          FROM purchase_invoice_details d
-          JOIN purchase_invoices i ON d.invoice_id = i.id
-          JOIN products p ON d.product_id = p.id
-          JOIN suppliers s ON i.supplier_id = s.id
-          WHERE p.id IN ($validPidsStr)
-        ''';
-
-        if (filterSupplier) queryBar += ' AND i.supplier_id IN ($sIds)';
-        if (analysisType.value == 'Barang' && filterProduct) {
-          queryBar += ' AND p.id IN ($pIds)';
-        } else if (analysisType.value == 'Kategori' && filterCategory) {
-          queryBar += ' AND p.category_id IN ($cIds)';
+      List<PriceHistoryItem> history = [];
+      for (var map in maps) {
+        final price = (map['base_unit_price'] as num?)?.toDouble() ?? 0;
+        double diff = 0;
+        if (cheapest != double.infinity && cheapest > 0) {
+          diff = ((price - cheapest) / cheapest) * 100;
         }
 
-        final rawBar = await db.rawQuery(queryBar);
-        final processedBar = await compute(_processBarChart, rawBar);
-        barChartData.assignAll(processedBar);
+        history.add(
+          PriceHistoryItem(
+            supplierName: map['supplier_name'] as String? ?? 'Unknown',
+            baseUnitPrice: price,
+            invoiceDate: map['invoice_date'] as String,
+            percentageDiff: diff,
+          ),
+        );
       }
+
+      priceHistory.value = history;
     } catch (e) {
-      _logger.e('Failed to run analysis', error: e);
-      SnackbarHelper.show('Error', 'Gagal memuat analisis data', isError: true);
+      _logger.e('Failed to fetch price history', error: e);
     } finally {
       isLoading.value = false;
     }
   }
-}
 
-// Top-level functions for compute / Isolate
-List<Map<String, dynamic>> _processRecommendations(
-  List<Map<String, Object?>> rawData,
-) {
-  Set<String> seenProducts = {};
-  List<Map<String, dynamic>> result = [];
+  Future<void> insertManualPrice({
+    required int supplierId,
+    required double price,
+    required DateTime date,
+  }) async {
+    if (selectedProduct.value == null) return;
+    final product = selectedProduct.value!;
 
-  for (var row in rawData) {
-    String pname = row['product_name'] as String;
-    if (!seenProducts.contains(pname)) {
-      seenProducts.add(pname);
-      double buyPrice = (row['base_unit_price'] as num).toDouble();
-      // Rekomendasi: base_unit_price dibulatkan ke atas, ditambah 3000
-      double recPrice = buyPrice.ceilToDouble() + 3000;
-      result.add({
-        'product_name': pname,
-        'latest_buy_price': buyPrice,
-        'recommended_price': recPrice,
-        'date': row['invoice_date'],
+    try {
+      isLoading.value = true;
+      final db = await _dbHelper.database;
+
+      final invoiceNumber = 'MNL-${DateTime.now().millisecondsSinceEpoch}';
+      final dateStr = date.toIso8601String().split('T').first;
+
+      await db.transaction((txn) async {
+        final invoiceId = await txn.insert('purchase_invoices', {
+          'invoice_number': invoiceNumber,
+          'supplier_id': supplierId,
+          'invoice_date': dateStr,
+          'payment_method': 'Tunai',
+          'total_nominal': price,
+          'status': 'Lunas',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        await txn.insert('purchase_invoice_details', {
+          'invoice_id': invoiceId,
+          'product_id': product.id,
+          'unit_id': product.unitId ?? 0, // Fallback to 0 if unitId is null
+          'qty': 0,
+          'unit_price': price,
+          'total_price': price,
+          'base_unit_price': price,
+        });
       });
+
+      // Reload history
+      fetchPriceHistory(product.id!);
+    } catch (e) {
+      _logger.e('Failed to insert manual price', error: e);
+    } finally {
+      isLoading.value = false;
     }
   }
-  return result;
-}
-
-List<Map<String, dynamic>> _processLineChart(
-  List<Map<String, Object?>> rawData,
-) {
-  // Group by Product Name
-  // Then inside, have a list of lines (one for each supplier)
-  Map<String, Map<String, List<Map<String, dynamic>>>> grouped = {};
-
-  for (var row in rawData) {
-    String pName = row['product_name'] as String;
-    String sName = row['supplier_name'] as String;
-    String dateStr = row['invoice_date'] as String;
-    double price = (row['base_unit_price'] as num).toDouble();
-
-    DateTime d = DateTime.parse(dateStr);
-
-    if (!grouped.containsKey(pName)) {
-      grouped[pName] = {};
-    }
-    if (!grouped[pName]!.containsKey(sName)) {
-      grouped[pName]![sName] = [];
-    }
-    grouped[pName]![sName]!.add({'x': d, 'y': price});
-  }
-
-  List<Map<String, dynamic>> result = [];
-  grouped.forEach((pName, suppliers) {
-    List<Map<String, dynamic>> lines = [];
-    suppliers.forEach((sName, points) {
-      lines.add({
-        'label': sName, // Line label is Supplier
-        'points': points,
-      });
-    });
-    result.add({'product_name': pName, 'lines': lines});
-  });
-
-  return result;
-}
-
-List<Map<String, dynamic>> _processBarChart(
-  List<Map<String, Object?>> rawData,
-) {
-  // Group by Product
-  // Then by Supplier to get average
-  Map<String, Map<String, List<double>>> productSupplierPrices = {};
-
-  for (var row in rawData) {
-    String pName = row['product_name'] as String;
-    String sName = row['supplier_name'] as String;
-    double price = (row['base_unit_price'] as num).toDouble();
-
-    if (!productSupplierPrices.containsKey(pName)) {
-      productSupplierPrices[pName] = {};
-    }
-    if (!productSupplierPrices[pName]!.containsKey(sName)) {
-      productSupplierPrices[pName]![sName] = [];
-    }
-    productSupplierPrices[pName]![sName]!.add(price);
-  }
-
-  List<Map<String, dynamic>> result = [];
-
-  productSupplierPrices.forEach((productName, supplierMap) {
-    List<Map<String, dynamic>> suppliersData = [];
-    supplierMap.forEach((supplierName, prices) {
-      double sum = prices.fold(0.0, (a, b) => a + b);
-      double avg = sum / prices.length;
-      suppliersData.add({'supplier_name': supplierName, 'avg_price': avg});
-    });
-    result.add({'product_name': productName, 'suppliers': suppliersData});
-  });
-
-  return result;
 }
