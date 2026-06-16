@@ -16,6 +16,9 @@ class PosPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    TextEditingController? localSearchController;
+    FocusNode? localFocusNode;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -31,108 +34,155 @@ class PosPage extends StatelessWidget {
         elevation: 1,
       ),
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left: Product Search & Search Results
+          // Left: Search & Cart Items
           Expanded(
             flex: 2,
             child: Container(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  TextField(
-                    onChanged: _controller.searchProducts,
-                    decoration: InputDecoration(
-                      hintText: 'Cari barang atau scan barcode...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: Obx(() {
-                      if (_controller.searchResults.isEmpty) {
-                        return const Center(
-                          child: Text('Barang tidak ditemukan.'),
-                        );
-                      }
-                      return GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              childAspectRatio: 1.5,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                        itemCount: _controller.searchResults.length,
-                        itemBuilder: (context, index) {
-                          final item = _controller.searchResults[index];
-                          return InkWell(
-                            onTap: () => _controller.addToCart(item),
-                            child: Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      item['name'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _currencyFormat.format(
-                                        item['sell_price'],
-                                      ),
-                                      style: const TextStyle(
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Stok: ${item['stock']} ${item['base_unit_name']}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Right: Cart & Checkout
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Autocomplete<Map<String, dynamic>>(
+                    displayStringForOption: (option) =>
+                        '${option['barcode']} - ${option['name']} (Stok: ${option['stock']})',
+                    optionsBuilder: (textEditingValue) async {
+                      if (textEditingValue.text.isEmpty) {
+                        return const Iterable<Map<String, dynamic>>.empty();
+                      }
+                      return await _controller.searchProductsAsync(
+                        textEditingValue.text,
+                      );
+                    },
+                    onSelected: (selection) {
+                      _controller.addToCart(selection);
+                      localSearchController?.clear();
+                      localFocusNode?.requestFocus();
+                    },
+                    fieldViewBuilder:
+                        (
+                          context,
+                          textEditingController,
+                          focusNode,
+                          onFieldSubmitted,
+                        ) {
+                          localSearchController = textEditingController;
+                          localFocusNode = focusNode;
+                          return TextField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Ketik nama barang atau SKU / Scan Barcode...',
+                              prefixIcon: const Icon(
+                                Icons.search,
+                                color: AppColors.primary,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            onSubmitted: (value) {
+                              onFieldSubmitted();
+                            },
+                          );
+                        },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 4,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width * 0.6,
+                            constraints: const BoxConstraints(maxHeight: 300),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              itemCount: options.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final option = options.elementAt(index);
+                                return Builder(
+                                  builder: (BuildContext context) {
+                                    final bool highlight =
+                                        AutocompleteHighlightedOption.of(
+                                          context,
+                                        ) ==
+                                        index;
+                                    return Container(
+                                      color: highlight
+                                          ? AppColors.primary.withOpacity(0.1)
+                                          : null,
+                                      child: InkWell(
+                                        onTap: () {
+                                          onSelected(option);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16.0),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Colors.grey.shade200,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${option['barcode']} - ${option['name']}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                              Text(
+                                                'Stok: ${option['stock']}',
+                                                style: const TextStyle(
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
                   const Text(
-                    'Keranjang Belanja',
+                    'Daftar Belanjaan',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const Divider(),
+                  const SizedBox(height: 12),
+                  // Cart List
                   Expanded(
                     child: Obx(
                       () => ListView.builder(
@@ -140,124 +190,204 @@ class PosPage extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final item = _controller.cartItems[index];
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              title: Text(item['product_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove, size: 20),
-                                  onPressed: () => _controller.updateQty(
-                                    index,
-                                    item['qty'] - 1,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                              contentPadding: const EdgeInsets.all(14),
+                              title: Text(
+                                item['product_name'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
-                                InkWell(
-                                  onTap: () {
-                                    TextEditingController qtyCtrl =
-                                        TextEditingController(
-                                          text: item['qty'].toString(),
-                                        );
-                                    Get.defaultDialog(
-                                      title: 'Ubah Jumlah',
-                                      content: TextField(
-                                        controller: qtyCtrl,
-                                        keyboardType: TextInputType.number,
-                                        autofocus: true,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Jumlah',
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 10.0),
+                                child: Row(
+                                  children: [
+                                    // Qty Control
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
                                         ),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      onConfirm: () {
-                                        _controller.updateQty(
-                                          index,
-                                          int.tryParse(qtyCtrl.text) ?? 1,
-                                        );
-                                        Get.back();
-                                      },
-                                      textConfirm: 'Simpan',
-                                      textCancel: 'Batal',
-                                      confirmTextColor: Colors.white,
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${item['qty']}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                      child: Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.remove,
+                                              size: 16,
+                                            ),
+                                            onPressed: () =>
+                                                _controller.updateQty(
+                                                  index,
+                                                  item['qty'] - 1,
+                                                ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 36,
+                                              minHeight: 36,
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          InkWell(
+                                            onTap: () {
+                                              TextEditingController qtyCtrl =
+                                                  TextEditingController(
+                                                    text: item['qty']
+                                                        .toString(),
+                                                  );
+                                              Get.defaultDialog(
+                                                title: 'Ubah Jumlah',
+                                                content: TextField(
+                                                  controller: qtyCtrl,
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  autofocus: true,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'Jumlah',
+                                                      ),
+                                                ),
+                                                onConfirm: () {
+                                                  _controller.updateQty(
+                                                    index,
+                                                    int.tryParse(
+                                                          qtyCtrl.text,
+                                                        ) ??
+                                                        1,
+                                                  );
+                                                  Get.back();
+                                                },
+                                                textConfirm: 'Simpan',
+                                                textCancel: 'Batal',
+                                                confirmTextColor: Colors.white,
+                                              );
+                                            },
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
+                                              color: Colors.grey.shade50,
+                                              child: Text(
+                                                '${item['qty']}',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.add,
+                                              size: 16,
+                                            ),
+                                            onPressed: () =>
+                                                _controller.updateQty(
+                                                  index,
+                                                  item['qty'] + 1,
+                                                ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 36,
+                                              minHeight: 36,
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                        ],
                                       ),
                                     ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      '@ ${_currencyFormat.format(item['unit_price'])}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              trailing: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    _currencyFormat.format(item['total_price']),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.add, size: 20),
-                                  onPressed: () => _controller.updateQty(
-                                    index,
-                                    item['qty'] + 1,
+                                  const SizedBox(height: 5),
+                                  InkWell(
+                                    onTap: () =>
+                                        _controller.removeCartItem(index),
+                                    child: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                      size: 20,
+                                    ),
                                   ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'x ${_currencyFormat.format(item['unit_price'])}',
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _currencyFormat.format(item['total_price']),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  onPressed: () =>
-                                      _controller.removeCartItem(index),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                          );
                         },
                       ),
                     ),
                   ),
-                  const Divider(),
+                ],
+              ),
+            ),
+          ),
+
+          // Right: Checkout & Payment Summary
+          Expanded(
+            flex: 1,
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Ringkasan Transaksi',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+
                   // Customer Selection
+                  const Text(
+                    'Pelanggan',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
                   Obx(
                     () => DropdownButtonFormField<int>(
-                      decoration: const InputDecoration(labelText: 'Pelanggan'),
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
                       value: _controller.selectedCustomerId.value,
                       items: _controller.customers
                           .map(
@@ -271,17 +401,32 @@ class PosPage extends StatelessWidget {
                           _controller.selectedCustomerId.value = val,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // Payment Method
+                  const Text(
+                    'Metode Pembayaran',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
                   Obx(
                     () => DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Metode Pembayaran',
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                       ),
                       value: _controller.paymentMethod.value,
                       items: const [
                         DropdownMenuItem(value: 'Tunai', child: Text('Tunai')),
+                        DropdownMenuItem(
+                          value: 'Transfer',
+                          child: Text('Transfer'),
+                        ),
                         DropdownMenuItem(
                           value: 'Hutang',
                           child: Text('Hutang / Tempo'),
@@ -291,23 +436,42 @@ class PosPage extends StatelessWidget {
                           _controller.paymentMethod.value = val ?? 'Tunai',
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // Amount Paid if Tunai
                   Obx(
                     () => _controller.paymentMethod.value == 'Tunai'
-                        ? TextField(
-                            decoration: const InputDecoration(
-                              labelText: 'Uang Diterima',
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: _controller.setAmountPaid,
-                            controller: _controller.uangDiterimaController,
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Uang Diterima',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  prefixText: 'Rp ',
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: _controller.setAmountPaid,
+                                controller: _controller.uangDiterimaController,
+                              ),
+                            ],
                           )
                         : const SizedBox.shrink(),
                   ),
 
-                  const SizedBox(height: 24),
+                  const Spacer(),
+                  const Divider(thickness: 2),
+                  const SizedBox(height: 16),
 
                   // Total
                   Obx(
@@ -315,7 +479,7 @@ class PosPage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Total:',
+                          'TOTAL:',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -324,7 +488,7 @@ class PosPage extends StatelessWidget {
                         Text(
                           _currencyFormat.format(_controller.totalNominal),
                           style: const TextStyle(
-                            fontSize: 24,
+                            fontSize: 28,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primary,
                           ),
@@ -332,6 +496,36 @@ class PosPage extends StatelessWidget {
                       ],
                     ),
                   ),
+
+                  // Kembalian
+                  Obx(() {
+                    if (_controller.paymentMethod.value == 'Tunai' &&
+                        _controller.amountPaid.value > 0) {
+                      double change =
+                          _controller.amountPaid.value -
+                          _controller.totalNominal;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Kembalian:',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            Text(
+                              _currencyFormat.format(change > 0 ? change : 0),
+                              style: TextStyle(
+                                color: change >= 0 ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
 
                   const SizedBox(height: 24),
 
@@ -341,15 +535,16 @@ class PosPage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                     child: const Text(
                       'BAYAR SEKARANG',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),

@@ -15,8 +15,7 @@ class POSController extends GetxController {
   var customers = <Map<String, dynamic>>[].obs;
   var selectedCustomerId = RxnInt();
 
-  var searchQuery = ''.obs;
-  var searchResults = <Map<String, dynamic>>[].obs;
+  // searchResults no longer needed for Autocomplete
 
   var paymentMethod = 'Tunai'.obs; // Tunai, Hutang (Piutang bagi toko)
   var amountPaid = 0.0.obs;
@@ -34,7 +33,6 @@ class POSController extends GetxController {
   void onInit() {
     super.onInit();
     _loadCustomers();
-    searchProducts(''); // Load initial 30 products
   }
 
   Future<void> _loadCustomers() async {
@@ -55,33 +53,31 @@ class POSController extends GetxController {
     }
   }
 
-  Future<void> searchProducts(String query) async {
-    searchQuery.value = query;
+  Future<List<Map<String, dynamic>>> searchProductsAsync(String query) async {
     try {
       Database db = await _dbHelper.database;
-      List<Map<String, dynamic>> data;
       if (query.isEmpty) {
-        data = await db.rawQuery('''
+        return await db.rawQuery('''
           SELECT p.*, u.name as base_unit_name
           FROM products p
           LEFT JOIN units u ON p.unit_id = u.id
-          LIMIT 30
+          LIMIT 50
         ''');
       } else {
-        data = await db.rawQuery(
+        return await db.rawQuery(
           '''
           SELECT p.*, u.name as base_unit_name
           FROM products p
           LEFT JOIN units u ON p.unit_id = u.id
           WHERE p.name LIKE ? OR p.barcode LIKE ?
-          LIMIT 30
+          LIMIT 50
         ''',
           ['%$query%', '%$query%'],
         );
       }
-      searchResults.assignAll(data);
     } catch (e) {
       _logger.e("Error searching products", error: e);
+      return [];
     }
   }
 
@@ -110,8 +106,6 @@ class POSController extends GetxController {
         'total_price': product['sell_price'],
       });
     }
-    searchResults.clear();
-    searchQuery.value = '';
   }
 
   void updateQty(int index, int qty) {
@@ -284,6 +278,5 @@ class POSController extends GetxController {
     amountPaid.value = 0.0;
     paymentMethod.value = 'Tunai';
     uangDiterimaController.text = ''; // Kosongkan textfield
-    searchProducts(''); // Reload 30 products instead of clearing
   }
 }
