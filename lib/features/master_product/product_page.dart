@@ -128,7 +128,7 @@ class _ProductPageState extends State<ProductPage> {
                         Expanded(
                           child: DropdownButtonFormField<int>(
                             value: selectedCategoryId,
-                            decoration: const InputDecoration(labelText: 'Kategori'),
+
                             items: [
                               const DropdownMenuItem<int>(
                                 value: null,
@@ -146,7 +146,10 @@ class _ProductPageState extends State<ProductPage> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add_circle, color: AppColors.primary),
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: AppColors.primary,
+                          ),
                           onPressed: () async {
                             await Get.toNamed(AppRoutes.masterCategory);
                             await _controller.fetchDependencies();
@@ -178,7 +181,10 @@ class _ProductPageState extends State<ProductPage> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add_circle, color: AppColors.primary),
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: AppColors.primary,
+                          ),
                           onPressed: () async {
                             await Get.toNamed(AppRoutes.masterUnit);
                             await _controller.fetchDependencies();
@@ -364,7 +370,10 @@ class _ProductPageState extends State<ProductPage> {
                             setDialogState(() {});
                           },
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Tambah Supplier', style: TextStyle(fontSize: 12)),
+                          label: const Text(
+                            'Tambah Supplier',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -592,50 +601,97 @@ class _ProductPageState extends State<ProductPage> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Obx(() => DropdownButtonFormField<int?>(
-                  decoration: const InputDecoration(labelText: 'Kategori'),
-                  value: _controller.selectedCategoryId.value,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('Semua Kategori')),
-                    ..._controller.categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-                  ],
-                  onChanged: (val) => _controller.applyFilter(categoryId: val, supplierId: _controller.selectedSupplierId.value),
-                )),
+                child: Obx(
+                  () => DropdownButtonFormField<int?>(
+                    decoration: const InputDecoration(),
+                    value: _controller.selectedCategoryId.value,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Kategori'),
+                      ),
+                      ..._controller.categories.map(
+                        (c) =>
+                            DropdownMenuItem(value: c.id, child: Text(c.name)),
+                      ),
+                    ],
+                    onChanged: (val) => _controller.applyFilter(
+                      categoryId: val,
+                      supplierId: _controller.selectedSupplierId.value,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Obx(() => DropdownButtonFormField<int?>(
-                  decoration: const InputDecoration(labelText: 'Supplier'),
-                  value: _controller.selectedSupplierId.value,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('Semua Supplier')),
-                    ..._controller.suppliers.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
-                  ],
-                  onChanged: (val) => _controller.applyFilter(categoryId: _controller.selectedCategoryId.value, supplierId: val),
-                )),
+                child: Obx(
+                  () => DropdownButtonFormField<int?>(
+                    decoration: const InputDecoration(),
+                    value: _controller.selectedSupplierId.value,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Supplier'),
+                      ),
+                      ..._controller.suppliers.map(
+                        (s) =>
+                            DropdownMenuItem(value: s.id, child: Text(s.name)),
+                      ),
+                    ],
+                    onChanged: (val) => _controller.applyFilter(
+                      categoryId: _controller.selectedCategoryId.value,
+                      supplierId: val,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Obx(() => DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Urutkan'),
-                  value: _controller.sortBy.value,
-                  items: const [
-                    DropdownMenuItem(value: 'name', child: Text('Nama Barang')),
-                    DropdownMenuItem(value: 'stock', child: Text('Stok')),
-                    DropdownMenuItem(value: 'barcode', child: Text('SKU / Barcode')),
-                    DropdownMenuItem(value: 'min_stock', child: Text('Min. Stok')),
-                    DropdownMenuItem(value: 'buy_price', child: Text('Harga Beli')),
-                    DropdownMenuItem(value: 'sell_price', child: Text('Harga Jual')),
-                  ],
-                  onChanged: (val) => _controller.applySort(val ?? 'name'),
-                )),
+                child: Obx(
+                  () => DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(),
+                    value: _controller.sortBy.value,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'name',
+                        child: Text('Nama Barang'),
+                      ),
+                      DropdownMenuItem(value: 'stock', child: Text('Stok')),
+                      DropdownMenuItem(
+                        value: 'barcode',
+                        child: Text('SKU / Barcode'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'min_stock',
+                        child: Text('Min. Stok'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'buy_price',
+                        child: Text('Harga Beli'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'sell_price',
+                        child: Text('Harga Jual'),
+                      ),
+                    ],
+                    onChanged: (val) => _controller.applySort(val ?? 'name'),
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
-              Obx(() => IconButton(
-                icon: Icon(_controller.sortAscending.value ? Icons.arrow_upward : Icons.arrow_downward),
-                onPressed: () => _controller.toggleSortDirection(),
-                tooltip: _controller.sortAscending.value ? 'Menaik (Ascending)' : 'Menurun (Descending)',
-              )),
+              Obx(
+                () => IconButton(
+                  icon: Icon(
+                    _controller.sortAscending.value
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                  ),
+                  onPressed: () => _controller.toggleSortDirection(),
+                  tooltip: _controller.sortAscending.value
+                      ? 'Menaik (Ascending)'
+                      : 'Menurun (Descending)',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -673,137 +729,232 @@ class _ProductPageState extends State<ProductPage> {
                   children: [
                     // Table Header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
                       ),
                       child: const Row(
                         children: [
-                          Expanded(flex: 2, child: Text('Barcode/SKU', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 3, child: Text('Nama Barang', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 2, child: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 2, child: Text('Stok', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 2, child: Text('Min. Stok', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 2, child: Text('Harga Beli', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 2, child: Text('Harga Jual', style: TextStyle(fontWeight: FontWeight.bold))),
-                          SizedBox(width: 80, child: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Barcode/SKU',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              'Nama Barang',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Kategori',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Stok',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Min. Stok',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Harga Beli',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Harga Jual',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              'Aksi',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     Expanded(
                       child: ListView.separated(
-                  controller: _scrollController,
-                  itemCount:
-                      _controller.products.length +
-                      (_controller.hasMoreData.value ? 1 : 0),
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    if (index == _controller.products.length) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-
-                    final p = _controller.products[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: Text(p.barcode, style: const TextStyle(fontWeight: FontWeight.w500)),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                if (p.supplierNames != null && p.supplierNames!.isNotEmpty)
-                                  Text(
-                                    "Sup: ${p.supplierNames}",
-                                    style: const TextStyle(fontSize: 11, color: AppColors.secondary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text(p.categoryName ?? '-'),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              '${p.stock} ${p.unitName ?? '-'}',
-                              style: TextStyle(
-                                color: p.stock <= p.minStock ? Colors.red : null,
-                                fontWeight: p.stock <= p.minStock ? FontWeight.bold : null,
+                        controller: _scrollController,
+                        itemCount:
+                            _controller.products.length +
+                            (_controller.hasMoreData.value ? 1 : 0),
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          if (index == _controller.products.length) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
                               ),
+                            );
+                          }
+
+                          final p = _controller.products[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text('${p.minStock} ${p.unitName ?? '-'}'),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text('Rp ${p.buyPrice}'),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text('Rp ${p.sellPrice}'),
-                          ),
-                          SizedBox(
-                            width: 80,
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: AppColors.primary, size: 18),
-                                  onPressed: () => _showFormDialog(product: p),
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    p.barcode,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error, size: 18),
-                                  onPressed: () {
-                                    Get.dialog(
-                                      CustomDialog(
-                                        title: 'Hapus Barang',
-                                        content: Text('Apakah Anda yakin ingin menghapus ${p.name}?'),
-                                        confirmText: 'Hapus',
-                                        isDestructive: true,
-                                        onCancel: () => Get.back(),
-                                        onConfirm: () {
-                                          _controller.deleteProduct(p.id!);
-                                          Get.back();
-                                        },
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    );
-                                  },
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      if (p.supplierNames != null &&
+                                          p.supplierNames!.isNotEmpty)
+                                        Text(
+                                          "Sup: ${p.supplierNames}",
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.secondary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(p.categoryName ?? '-'),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    '${p.stock} ${p.unitName ?? '-'}',
+                                    style: TextStyle(
+                                      color: p.stock <= p.minStock
+                                          ? Colors.red
+                                          : null,
+                                      fontWeight: p.stock <= p.minStock
+                                          ? FontWeight.bold
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    '${p.minStock} ${p.unitName ?? '-'}',
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text('Rp ${p.buyPrice}'),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text('Rp ${p.sellPrice}'),
+                                ),
+                                SizedBox(
+                                  width: 80,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          color: AppColors.primary,
+                                          size: 18,
+                                        ),
+                                        onPressed: () =>
+                                            _showFormDialog(product: p),
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: AppColors.error,
+                                          size: 18,
+                                        ),
+                                        onPressed: () {
+                                          Get.dialog(
+                                            CustomDialog(
+                                              title: 'Hapus Barang',
+                                              content: Text(
+                                                'Apakah Anda yakin ingin menghapus ${p.name}?',
+                                              ),
+                                              confirmText: 'Hapus',
+                                              isDestructive: true,
+                                              onCancel: () => Get.back(),
+                                              onConfirm: () {
+                                                _controller.deleteProduct(
+                                                  p.id!,
+                                                );
+                                                Get.back();
+                                              },
+                                            ),
+                                          );
+                                        },
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
+              );
             }),
           ),
         ],

@@ -53,6 +53,159 @@ class PurchaseInvoicePage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<String?>(
+                    decoration: const InputDecoration(),
+                    value: _controller.selectedStatus.value,
+                    items: const [
+                      DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Status'),
+                      ),
+                      DropdownMenuItem(value: 'Lunas', child: Text('Lunas')),
+                      DropdownMenuItem(
+                        value: 'Belum Lunas',
+                        child: Text('Belum Lunas'),
+                      ),
+                    ],
+                    onChanged: (val) => _controller.applyFilter(
+                      status: val,
+                      supplierId: _controller.selectedSupplierId.value,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<int?>(
+                    decoration: const InputDecoration(),
+                    value: _controller.selectedSupplierId.value,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Supplier'),
+                      ),
+                      ..._controller.suppliers.map(
+                        (s) =>
+                            DropdownMenuItem(value: s.id, child: Text(s.name)),
+                      ),
+                    ],
+                    onChanged: (val) => _controller.applyFilter(
+                      status: _controller.selectedStatus.value,
+                      supplierId: val,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(),
+                    value: _controller.sortBy.value,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'created_at',
+                        child: Text('Tanggal Dibuat'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'total_nominal',
+                        child: Text('Total Nominal'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'due_date',
+                        child: Text('Jatuh Tempo'),
+                      ),
+                    ],
+                    onChanged: (val) =>
+                        _controller.applySort(val ?? 'created_at'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Obx(
+                () => IconButton(
+                  icon: Icon(
+                    _controller.sortAscending.value
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                  ),
+                  onPressed: () => _controller.toggleSortDirection(),
+                  tooltip: _controller.sortAscending.value
+                      ? 'Menaik (Ascending)'
+                      : 'Menurun (Descending)',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Obx(() {
+            if (_controller.selectedSupplierId.value != null) {
+              final formatter = NumberFormat.currency(
+                locale: 'id_ID',
+                symbol: 'Rp ',
+                decimalDigits: 0,
+              );
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildSummaryItem(
+                        'Total Invoices',
+                        _controller.totalInvoicesCount,
+                        _controller.totalInvoicesAmount,
+                        formatter,
+                        AppColors.primary,
+                      ),
+                    ),
+                    Container(
+                      height: 40,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                    Expanded(
+                      child: _buildSummaryItem(
+                        'Lunas',
+                        _controller.totalLunasCount,
+                        _controller.totalLunasAmount,
+                        formatter,
+                        AppColors.success,
+                      ),
+                    ),
+                    Container(
+                      height: 40,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                    Expanded(
+                      child: _buildSummaryItem(
+                        'Belum Lunas',
+                        _controller.totalBelumLunasCount,
+                        _controller.totalBelumLunasAmount,
+                        formatter,
+                        AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
           Expanded(
             child: Obx(() {
               if (_controller.isLoading.value) {
@@ -89,8 +242,10 @@ class PurchaseInvoicePage extends StatelessWidget {
                   } catch (e) {
                     date = null;
                   }
-                  String formattedDate = date != null ? DateFormat('dd MMM yyyy').format(date) : invoice.invoiceDate;
-                  
+                  String formattedDate = date != null
+                      ? DateFormat('dd MMM yyyy').format(date)
+                      : invoice.invoiceDate;
+
                   DateTime? dueDate;
                   try {
                     if (invoice.dueDate != null) {
@@ -99,7 +254,9 @@ class PurchaseInvoicePage extends StatelessWidget {
                   } catch (e) {
                     dueDate = null;
                   }
-                  String formattedDueDate = dueDate != null ? DateFormat('dd MMM yyyy').format(dueDate) : (invoice.dueDate ?? '-');
+                  String formattedDueDate = dueDate != null
+                      ? DateFormat('dd MMM yyyy').format(dueDate)
+                      : (invoice.dueDate ?? '-');
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -287,24 +444,59 @@ class PurchaseInvoicePage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Supplier: ${invoice.supplierName ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text('Tipe Pembayaran: ${invoice.paymentMethod}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Supplier: ${invoice.supplierName ?? '-'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Tipe Pembayaran: ${invoice.paymentMethod}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               Flexible(
                 child: SingleChildScrollView(
                   child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(Colors.grey.shade100),
+                    headingRowColor: MaterialStateProperty.all(
+                      Colors.grey.shade100,
+                    ),
                     columns: const [
-                      DataColumn(label: Text('Nama Barang', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Qty (Satuan)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Masuk (Dasar)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Harga Beli', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(
+                        label: Text(
+                          'Nama Barang',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Qty (Satuan)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Masuk (Dasar)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Harga Beli',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Total',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                     rows: invoice.details.map((d) {
-                      double mult = d.baseUnitPrice > 0 ? (d.unitPrice / d.baseUnitPrice) : 1;
+                      double mult = d.baseUnitPrice > 0
+                          ? (d.unitPrice / d.baseUnitPrice)
+                          : 1;
                       int baseQty = (d.qty * mult).round();
                       return DataRow(
                         cells: [
@@ -326,15 +518,84 @@ class PurchaseInvoicePage extends StatelessWidget {
                   onPressed: () => Get.back(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('Tutup', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Tutup',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(
+    String title,
+    int count,
+    double amount,
+    NumberFormat formatter,
+    Color color,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatter.format(amount),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

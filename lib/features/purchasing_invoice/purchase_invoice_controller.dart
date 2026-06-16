@@ -16,11 +16,60 @@ class PurchaseInvoiceController extends GetxController {
   final Logger _logger = Logger();
 
   var invoices = <PurchaseInvoice>[].obs;
+  var suppliers = <Supplier>[].obs;
   var isLoading = false.obs;
+
+  // Filter & Sort
+  var selectedStatus = Rxn<String>(); // 'Lunas', 'Belum Lunas'
+  var selectedSupplierId = Rxn<int>();
+  var sortBy = 'created_at'.obs; // 'created_at', 'total_nominal', 'due_date'
+  var sortAscending = false.obs;
+
+  // Summaries
+  int get totalInvoicesCount => invoices.length;
+  double get totalInvoicesAmount => invoices.fold(0, (sum, item) => sum + item.totalNominal);
+
+  int get totalLunasCount => invoices.where((i) => i.status == 'Lunas').length;
+  double get totalLunasAmount => invoices.where((i) => i.status == 'Lunas').fold(0, (sum, item) => sum + item.totalNominal);
+
+  int get totalBelumLunasCount => invoices.where((i) => i.status == 'Belum Lunas').length;
+  double get totalBelumLunasAmount => invoices.where((i) => i.status == 'Belum Lunas').fold(0, (sum, item) => sum + item.totalNominal);
 
   @override
   void onInit() {
     super.onInit();
+    fetchDependencies();
+    fetchInvoices();
+  }
+
+  Future<void> fetchDependencies() async {
+    try {
+      final db = await _dbHelper.database;
+      final supMaps = await db.query('suppliers');
+      suppliers.value = supMaps.map((e) => Supplier.fromJson(e)).toList();
+    } catch (e) {
+      _logger.e("Error fetching suppliers", error: e);
+    }
+  }
+
+  void applyFilter({String? status, int? supplierId}) {
+    selectedStatus.value = status;
+    selectedSupplierId.value = supplierId;
+    fetchInvoices();
+  }
+
+  void applySort(String field) {
+    if (sortBy.value == field) {
+      sortAscending.value = !sortAscending.value;
+    } else {
+      sortBy.value = field;
+      sortAscending.value = true;
+    }
+    fetchInvoices();
+  }
+
+  void toggleSortDirection() {
+    sortAscending.value = !sortAscending.value;
     fetchInvoices();
   }
 
@@ -28,11 +77,31 @@ class PurchaseInvoiceController extends GetxController {
     isLoading.value = true;
     try {
       final db = await _dbHelper.database;
+      List<String> conditions = [];
+      if (selectedStatus.value != null) {
+        conditions.add('pi.status = "${selectedStatus.value}"');
+      }
+      if (selectedSupplierId.value != null) {
+        conditions.add('pi.supplier_id = ${selectedSupplierId.value}');
+      }
+      
+      String whereClause = conditions.isNotEmpty ? 'WHERE ${conditions.join(' AND ')}' : '';
+
+      String sortField = 'pi.created_at';
+      switch (sortBy.value) {
+        case 'total_nominal': sortField = 'pi.total_nominal'; break;
+        case 'due_date': sortField = 'pi.due_date'; break;
+        case 'created_at':
+        default: sortField = 'pi.created_at'; break;
+      }
+      String sortOrder = sortAscending.value ? 'ASC' : 'DESC';
+
       final maps = await db.rawQuery('''
         SELECT pi.*, s.name as supplier_name 
         FROM purchase_invoices pi
         LEFT JOIN suppliers s ON pi.supplier_id = s.id
-        ORDER BY pi.created_at DESC
+        $whereClause
+        ORDER BY $sortField $sortOrder
       ''');
 
       List<PurchaseInvoice> list = [];
