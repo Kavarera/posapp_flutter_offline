@@ -34,6 +34,9 @@ class _CustomerPageState extends State<CustomerPage> {
     final addressController = TextEditingController(
       text: customer?.address ?? '',
     );
+    final maxCreditController = TextEditingController(
+      text: customer?.maxCredit.toStringAsFixed(0) ?? '0',
+    );
 
     // Status Dropdown
     String selectedStatus = customer?.status ?? 'Aktif';
@@ -62,6 +65,14 @@ class _CustomerPageState extends State<CustomerPage> {
                   controller: addressController,
                   decoration: const InputDecoration(labelText: 'Alamat'),
                   maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: maxCreditController,
+                  decoration: const InputDecoration(
+                    labelText: 'Maksimal Hutang Limit',
+                  ),
+                  keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -98,6 +109,7 @@ class _CustomerPageState extends State<CustomerPage> {
                 status: selectedStatus,
                 receivableBalance:
                     customer?.receivableBalance ?? 0, // Hidden in Phase 1 edit
+                maxCredit: double.tryParse(maxCreditController.text) ?? 0,
                 createdAt:
                     customer?.createdAt ?? DateTime.now().toIso8601String(),
               );
@@ -129,16 +141,48 @@ class _CustomerPageState extends State<CustomerPage> {
                 'Master Customer',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showFormDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah Data'),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _controller.downloadTemplate(),
+                    icon: const Icon(Icons.download),
+                    label: const Text('Template CSV'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _controller.importCsv(),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload CSV'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _showFormDialog(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Data'),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 24),
           Expanded(
             child: Obx(() {
+              if (_controller.isImporting.value) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Sedang memproses CSV...'),
+                    ],
+                  ),
+                );
+              }
               if (_controller.isLoading.value) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -152,7 +196,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   maxCrossAxisExtent: 350,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: 1.4,
+                  childAspectRatio: 1.2,
                 ),
                 itemCount: _controller.customers.length,
                 itemBuilder: (context, index) {
@@ -334,6 +378,22 @@ class _CustomerPageState extends State<CustomerPage> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.error,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Limit Hutang',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Rp ${cust.maxCredit.toInt()}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ],

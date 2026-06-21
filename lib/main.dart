@@ -15,7 +15,6 @@ import 'package:posapp_w6zxit6s/core/services/path_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Get.putAsync(() => PathService().init());
-  Get.put(SessionService());
   // Initialize Desktop Window Manager
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -35,6 +34,7 @@ void main() async {
       await windowManager.setPreventClose(true);
     });
   }
+  Get.put(SessionService());
 
   runApp(const MyApp());
 }

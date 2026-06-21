@@ -46,7 +46,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 8,
+        version: 9,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -65,6 +65,26 @@ class DatabaseHelper {
           created_at TEXT
         )
       ''');
+    }
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE products ADD COLUMN wholesale_qty INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE products ADD COLUMN wholesale_price REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE customers ADD COLUMN max_credit REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE sales_transaction_details ADD COLUMN custom_product_name TEXT');
+      await db.execute('ALTER TABLE sales_transaction_details ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0');
+      
+      // Seed dummy product for custom items
+      await db.insert('products', {
+        'id': -1,
+        'name': 'Item Kustom',
+        'barcode': 'CUSTOM_ITEM',
+        'buy_price': 0,
+        'sell_price': 0,
+        'min_stock': 0,
+        'stock': 0,
+        'wholesale_qty': 0,
+        'wholesale_price': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
@@ -142,6 +162,8 @@ class DatabaseHelper {
         sell_price REAL NOT NULL DEFAULT 0,
         min_stock INTEGER NOT NULL DEFAULT 0,
         stock INTEGER NOT NULL DEFAULT 0,
+        wholesale_qty INTEGER NOT NULL DEFAULT 0,
+        wholesale_price REAL NOT NULL DEFAULT 0,
         created_at TEXT,
         updated_at TEXT,
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL,
@@ -169,6 +191,7 @@ class DatabaseHelper {
         phone TEXT,
         status TEXT NOT NULL DEFAULT 'Aktif',
         receivable_balance REAL NOT NULL DEFAULT 0,
+        max_credit REAL NOT NULL DEFAULT 0,
         created_at TEXT
       )
     ''');
@@ -237,6 +260,8 @@ class DatabaseHelper {
         unit_price REAL NOT NULL,
         total_price REAL NOT NULL,
         base_unit_price REAL NOT NULL,
+        custom_product_name TEXT,
+        is_custom INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (transaction_id) REFERENCES sales_transactions (id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT,
         FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE RESTRICT
@@ -286,7 +311,22 @@ class DatabaseHelper {
     // Seed default admin and default unit "Pcs"
     await _seedAdmin(db);
     await _seedDefaultData(db);
+    await _seedCustomItem(db);
     // await _seedDummyDataForTesting(db); // Disabled per user request
+  }
+
+  Future<void> _seedCustomItem(Database db) async {
+    await db.insert('products', {
+      'id': -1,
+      'name': 'Item Kustom',
+      'barcode': 'CUSTOM_ITEM',
+      'buy_price': 0,
+      'sell_price': 0,
+      'min_stock': 0,
+      'stock': 0,
+      'wholesale_qty': 0,
+      'wholesale_price': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> _seedAdmin(Database db) async {

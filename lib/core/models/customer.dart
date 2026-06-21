@@ -5,6 +5,7 @@ class Customer {
   final String? phone;
   final String status;
   final double receivableBalance;
+  final double maxCredit;
   final String? createdAt;
 
   Customer({
@@ -14,6 +15,7 @@ class Customer {
     this.phone,
     this.status = 'Aktif',
     this.receivableBalance = 0,
+    this.maxCredit = 0,
     this.createdAt,
   });
 
@@ -25,6 +27,7 @@ class Customer {
       phone: json['phone'] as String?,
       status: json['status'] as String? ?? 'Aktif',
       receivableBalance: (json['receivable_balance'] as num?)?.toDouble() ?? 0,
+      maxCredit: (json['max_credit'] as num?)?.toDouble() ?? 0,
       createdAt: json['created_at'] as String?,
     );
   }
@@ -36,6 +39,7 @@ class Customer {
       'phone': phone,
       'status': status,
       'receivable_balance': receivableBalance,
+      'max_credit': maxCredit,
       'created_at': createdAt,
     };
     if (id != null) {

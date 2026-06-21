@@ -71,6 +71,12 @@ class _ProductPageState extends State<ProductPage> {
     final minStockController = TextEditingController(
       text: product?.minStock.toString() ?? '0',
     );
+    final wholesaleQtyController = TextEditingController(
+      text: product?.wholesaleQty.toString() ?? '0',
+    );
+    final wholesalePriceController = TextEditingController(
+      text: product?.wholesalePrice.toString() ?? '0',
+    );
 
     int? selectedCategoryId = product?.categoryId;
     int? selectedUnitId = product?.unitId; // Base Unit
@@ -351,6 +357,30 @@ class _ProductPageState extends State<ProductPage> {
                       ),
                       keyboardType: TextInputType.number,
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: wholesaleQtyController,
+                            decoration: const InputDecoration(
+                              labelText: 'Minimal Qty Grosir (0 jika tidak ada)',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: wholesalePriceController,
+                            decoration: const InputDecoration(
+                              labelText: 'Harga Grosir',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -483,6 +513,8 @@ class _ProductPageState extends State<ProductPage> {
                 sellPrice: double.tryParse(sellController.text) ?? 0,
                 minStock: int.tryParse(minStockController.text) ?? 0,
                 stock: product?.stock ?? 0,
+                wholesaleQty: int.tryParse(wholesaleQtyController.text) ?? 0,
+                wholesalePrice: double.tryParse(wholesalePriceController.text) ?? 0,
                 supplierIds: selectedSuppliers,
                 productUnits: finalProductUnits,
               );

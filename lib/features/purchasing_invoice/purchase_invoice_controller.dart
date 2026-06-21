@@ -216,7 +216,7 @@ class PurchaseInvoiceController extends GetxController {
         '''
         SELECT p.* FROM products p
         INNER JOIN product_suppliers ps ON p.id = ps.product_id
-        WHERE ps.supplier_id = ?
+        WHERE ps.supplier_id = ? AND p.id != -1
         ORDER BY p.name ASC
       ''',
         [supplierId],

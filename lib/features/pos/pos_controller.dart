@@ -61,6 +61,7 @@ class POSController extends GetxController {
           SELECT p.*, u.name as base_unit_name
           FROM products p
           LEFT JOIN units u ON p.unit_id = u.id
+          WHERE p.id != -1
           LIMIT 50
         ''');
       } else {
@@ -69,7 +70,7 @@ class POSController extends GetxController {
           SELECT p.*, u.name as base_unit_name
           FROM products p
           LEFT JOIN units u ON p.unit_id = u.id
-          WHERE p.name LIKE ? OR p.barcode LIKE ?
+          WHERE (p.name LIKE ? OR p.barcode LIKE ?) AND p.id != -1
           LIMIT 50
         ''',
           ['%$query%', '%$query%'],
@@ -86,13 +87,7 @@ class POSController extends GetxController {
       (item) => item['product_id'] == product['id'],
     );
     if (index >= 0) {
-      var item = cartItems[index];
-      int newQty = item['qty'] + 1;
-      cartItems[index] = {
-        ...item,
-        'qty': newQty,
-        'total_price': newQty * item['unit_price'],
-      };
+      updateQty(index, cartItems[index]['qty'] + 1);
     } else {
       cartItems.add({
         'product_id': product['id'],
@@ -100,11 +95,16 @@ class POSController extends GetxController {
         'unit_id': product['unit_id'],
         'unit_name': product['base_unit_name'],
         'qty': 1,
+        'normal_price': product['sell_price'],
+        'wholesale_qty': product['wholesale_qty'] ?? 0,
+        'wholesale_price': (product['wholesale_price'] ?? 0).toDouble(),
+        'is_wholesale_approved': false,
         'unit_price': product['sell_price'],
-        'base_unit_price':
-            product['buy_price'], // Storing HPP for profit calculation
+        'base_unit_price': product['buy_price'], // Storing HPP for profit calculation
         'total_price': product['sell_price'],
       });
+      // Check if wholesale applies at qty = 1
+      updateQty(cartItems.length - 1, 1);
     }
   }
 
@@ -113,12 +113,56 @@ class POSController extends GetxController {
       cartItems.removeAt(index);
     } else {
       var item = cartItems[index];
+      int wQty = item['wholesale_qty'] ?? 0;
+      
+      if (wQty > 0 && qty >= wQty && item['is_wholesale_approved'] == false) {
+        // Prompt dialog
+        Get.defaultDialog(
+          title: "Harga Grosir",
+          middleText: "Kuantitas mencapai minimum grosir ($wQty). Gunakan harga grosir?",
+          textConfirm: "Ya",
+          textCancel: "Tidak",
+          confirmTextColor: Colors.white,
+          onConfirm: () {
+            _applyQtyChange(index, qty, true);
+            Get.back();
+          },
+          onCancel: () {
+            _applyQtyChange(index, qty, false);
+          }
+        );
+      } else {
+        bool isApproved = item['is_wholesale_approved'] ?? false;
+        // If qty drops below wholesale, reset approval
+        if (wQty > 0 && qty < wQty) {
+          isApproved = false;
+        }
+        _applyQtyChange(index, qty, isApproved);
+      }
+    }
+  }
+
+  void _applyQtyChange(int index, int qty, bool isWholesaleApproved) {
+      var item = cartItems[index];
+      int wQty = item['wholesale_qty'] ?? 0;
+      double wPrice = (item['wholesale_price'] ?? 0).toDouble();
+      double nPrice = (item['normal_price'] ?? item['unit_price']).toDouble();
+
+      double totalPrice = 0;
+      if (wQty > 0 && isWholesaleApproved && qty >= wQty) {
+        int grosirCount = (qty ~/ wQty) * wQty;
+        int normalCount = qty % wQty;
+        totalPrice = (grosirCount * wPrice) + (normalCount * nPrice);
+      } else {
+        totalPrice = qty * nPrice;
+      }
+
       cartItems[index] = {
         ...item,
         'qty': qty,
-        'total_price': qty * item['unit_price'],
+        'is_wholesale_approved': isWholesaleApproved,
+        'total_price': totalPrice,
       };
-    }
   }
 
   void removeCartItem(int index) {
@@ -141,16 +185,28 @@ class POSController extends GetxController {
     }
 
     if (paymentMethod.value == 'Hutang') {
-      if (selectedCustomerId.value == null) {
+      var selectedCust = customers.firstWhereOrNull((c) => c['id'] == selectedCustomerId.value);
+      if (selectedCust == null || selectedCust['name'] == 'Pelanggan Umum') {
         SnackbarHelper.show(
           'Peringatan',
-          'Pilih customer untuk transaksi Piutang.',
+          'Pembayaran hutang hanya berlaku untuk Member terdaftar (Bukan Pelanggan Umum).',
           isError: true,
         );
         return false;
       }
-    } else {
-      // Tunai
+      
+      double currentHutang = (selectedCust['receivable_balance'] ?? 0).toDouble();
+      double maxCredit = (selectedCust['max_credit'] ?? 0).toDouble();
+      
+      if (maxCredit > 0 && (currentHutang + totalNominal) > maxCredit) {
+        SnackbarHelper.show(
+          'Limit Hutang Terlampaui',
+          'Total hutang (Rp ${(currentHutang + totalNominal).toInt()}) melebihi limit maksimal (Rp ${maxCredit.toInt()}).',
+          isError: true,
+        );
+        return false;
+      }
+    } else if (paymentMethod.value == 'Tunai') {
       if (amountPaid.value < totalNominal) {
         SnackbarHelper.show(
           'Peringatan',
@@ -158,6 +214,21 @@ class POSController extends GetxController {
           isError: true,
         );
         return false;
+      }
+    } else if (paymentMethod.value == 'Digital') {
+      // Pembayaran Digital
+      bool confirmed = await Get.defaultDialog<bool>(
+        title: "Konfirmasi Pembayaran Digital",
+        middleText: "Apakah pembayaran sebesar Rp ${totalNominal.toInt()} sudah diterima ke rekening Anda?",
+        textConfirm: "Sudah",
+        textCancel: "Belum",
+        confirmTextColor: Colors.white,
+        onConfirm: () => Get.back(result: true),
+        onCancel: () {},
+      ) ?? false;
+      
+      if (!confirmed) {
+        return false; // Batal simpan
       }
     }
 
@@ -186,33 +257,70 @@ class POSController extends GetxController {
         });
 
         for (var item in cartItems) {
-          await txn.insert('sales_transaction_details', {
-            'transaction_id': insertedId,
-            'product_id': item['product_id'],
-            'unit_id': item['unit_id'],
-            'qty': item['qty'],
-            'unit_price': item['unit_price'],
-            'total_price': item['total_price'],
-            'base_unit_price': item['base_unit_price'], // HPP
-          });
+          int wQty = item['wholesale_qty'] ?? 0;
+          bool isWholesaleApproved = item['is_wholesale_approved'] ?? false;
+          int qty = item['qty'];
+          double nPrice = (item['normal_price'] ?? item['unit_price']).toDouble();
+          double wPrice = (item['wholesale_price'] ?? 0).toDouble();
+          
+          List<Map<String, dynamic>> finalRows = [];
+          
+          if (wQty > 0 && isWholesaleApproved && qty >= wQty) {
+            int grosirCount = (qty ~/ wQty) * wQty;
+            int normalCount = qty % wQty;
+            
+            finalRows.add({
+              'qty': grosirCount,
+              'unit_price': wPrice,
+              'total_price': grosirCount * wPrice,
+            });
+            if (normalCount > 0) {
+              finalRows.add({
+                'qty': normalCount,
+                'unit_price': nPrice,
+                'total_price': normalCount * nPrice,
+              });
+            }
+          } else {
+             finalRows.add({
+              'qty': qty,
+              'unit_price': nPrice,
+              'total_price': qty * nPrice,
+            });
+          }
 
-          // Deduct Stock
-          await txn.rawUpdate(
-            'UPDATE products SET stock = stock - ? WHERE id = ?',
-            [item['qty'], item['product_id']],
-          );
+          for (var row in finalRows) {
+            await txn.insert('sales_transaction_details', {
+              'transaction_id': insertedId,
+              'product_id': item['product_id'],
+              'unit_id': item['unit_id'] ?? 1,
+              'qty': row['qty'],
+              'unit_price': row['unit_price'],
+              'total_price': row['total_price'],
+              'base_unit_price': item['base_unit_price'], // HPP
+              'custom_product_name': item['product_id'] == -1 ? item['product_name'] : null,
+              'is_custom': item['product_id'] == -1 ? 1 : 0,
+            });
+          }
 
-          // Insert Stock Movement (OUT)
-          await txn.insert('stock_movements', {
-            'product_id': item['product_id'],
-            'type': 'OUT',
-            'reference_id': insertedId,
-            'qty': item['qty'],
-            'balance_after':
-                0, // Placeholder, usually computed via trigger or read
-            'note': 'Penjualan Kasir $trxNumber',
-            'created_at': nowStr,
-          });
+          // Deduct Stock only if it's NOT a custom item
+          if (item['product_id'] != -1) {
+            await txn.rawUpdate(
+              'UPDATE products SET stock = stock - ? WHERE id = ?',
+              [item['qty'], item['product_id']],
+            );
+
+            // Insert Stock Movement (OUT)
+            await txn.insert('stock_movements', {
+              'product_id': item['product_id'],
+              'type': 'OUT',
+              'reference_id': insertedId,
+              'qty': item['qty'],
+              'balance_after': 0, // Should be computed but 0 for performance now
+              'note': 'Penjualan Kasir $trxNumber',
+              'created_at': nowStr,
+            });
+          }
         }
 
         // Update customer receivable if Piutang

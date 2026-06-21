@@ -11,6 +11,8 @@ class Product {
   final double sellPrice;
   final int minStock;
   final int stock;
+  final int wholesaleQty;
+  final double wholesalePrice;
   final String? createdAt;
   final String? updatedAt;
 
@@ -32,6 +34,8 @@ class Product {
     this.sellPrice = 0,
     this.minStock = 0,
     this.stock = 0,
+    this.wholesaleQty = 0,
+    this.wholesalePrice = 0,
     this.createdAt,
     this.updatedAt,
     this.categoryName,
@@ -53,6 +57,8 @@ class Product {
       sellPrice: (json['sell_price'] as num?)?.toDouble() ?? 0,
       minStock: json['min_stock'] as int? ?? 0,
       stock: json['stock'] as int? ?? 0,
+      wholesaleQty: json['wholesale_qty'] as int? ?? 0,
+      wholesalePrice: (json['wholesale_price'] as num?)?.toDouble() ?? 0,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       categoryName: json['category_name'] as String?,
@@ -72,6 +78,8 @@ class Product {
       'sell_price': sellPrice,
       'min_stock': minStock,
       'stock': stock,
+      'wholesale_qty': wholesaleQty,
+      'wholesale_price': wholesalePrice,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };

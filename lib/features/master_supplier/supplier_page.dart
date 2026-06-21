@@ -107,16 +107,48 @@ class _SupplierPageState extends State<SupplierPage> {
                 'Master Supplier',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showFormDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah Data'),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _controller.downloadTemplate(),
+                    icon: const Icon(Icons.download),
+                    label: const Text('Template CSV'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _controller.importCsv(),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload CSV'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _showFormDialog(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Data'),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 24),
           Expanded(
             child: Obx(() {
+              if (_controller.isImporting.value) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Sedang memproses CSV...'),
+                    ],
+                  ),
+                );
+              }
               if (_controller.isLoading.value) {
                 return const Center(child: CircularProgressIndicator());
               }

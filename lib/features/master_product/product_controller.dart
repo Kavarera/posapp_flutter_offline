@@ -10,7 +10,7 @@ import 'package:posapp_w6zxit6s/core/models/category.dart' as category_model;
 import 'package:posapp_w6zxit6s/core/models/unit.dart';
 import 'package:posapp_w6zxit6s/core/models/supplier.dart';
 import 'package:posapp_w6zxit6s/core/models/product_unit.dart';
-import 'package:posapp_w6zxit6s/core/utils/csv_helper.dart';
+import 'package:posapp_w6zxit6s/core/services/csv_service.dart';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 
 class ProductController extends GetxController {
@@ -37,7 +37,8 @@ class ProductController extends GetxController {
   Timer? _debounce;
 
   // Sorting
-  var sortBy = 'name'.obs; // name, stock, barcode, min_stock, buy_price, sell_price
+  var sortBy =
+      'name'.obs; // name, stock, barcode, min_stock, buy_price, sell_price
   var sortAscending = true.obs;
 
   @override
@@ -120,9 +121,11 @@ class ProductController extends GetxController {
       isLoading.value = true;
       Database db = await _dbHelper.database;
 
-      List<String> conditions = [];
+      List<String> conditions = ['p.id != -1'];
       if (searchQuery.value.isNotEmpty) {
-        conditions.add('(p.name LIKE "%${searchQuery.value}%" OR p.barcode LIKE "%${searchQuery.value}%")');
+        conditions.add(
+          '(p.name LIKE "%${searchQuery.value}%" OR p.barcode LIKE "%${searchQuery.value}%")',
+        );
       }
       if (selectedCategoryId.value != null) {
         conditions.add('p.category_id = ${selectedCategoryId.value}');
@@ -130,18 +133,30 @@ class ProductController extends GetxController {
       if (selectedSupplierId.value != null) {
         conditions.add('ps.supplier_id = ${selectedSupplierId.value}');
       }
-      
-      String whereClause = conditions.isNotEmpty ? 'WHERE ${conditions.join(' AND ')}' : '';
+
+      String whereClause = 'WHERE ${conditions.join(' AND ')}';
 
       String sortField = 'p.name';
       switch (sortBy.value) {
-        case 'stock': sortField = 'p.stock'; break;
-        case 'barcode': sortField = 'p.barcode'; break;
-        case 'min_stock': sortField = 'p.min_stock'; break;
-        case 'buy_price': sortField = 'p.buy_price'; break;
-        case 'sell_price': sortField = 'p.sell_price'; break;
+        case 'stock':
+          sortField = 'p.stock';
+          break;
+        case 'barcode':
+          sortField = 'p.barcode';
+          break;
+        case 'min_stock':
+          sortField = 'p.min_stock';
+          break;
+        case 'buy_price':
+          sortField = 'p.buy_price';
+          break;
+        case 'sell_price':
+          sortField = 'p.sell_price';
+          break;
         case 'name':
-        default: sortField = 'p.name'; break;
+        default:
+          sortField = 'p.name';
+          break;
       }
       String sortOrder = sortAscending.value ? 'ASC' : 'DESC';
 
@@ -201,7 +216,7 @@ class ProductController extends GetxController {
       offset += limit;
     } catch (e) {
       _logger.e("Error fetching products", error: e);
-      Get.snackbar('Error', 'Gagal memuat barang');
+      SnackbarHelper.show('Error', 'Gagal memuat barang', isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -242,9 +257,10 @@ class ProductController extends GetxController {
       await fetchProducts();
     } catch (e) {
       _logger.e("Error adding product", error: e);
-      Get.snackbar(
+      SnackbarHelper.show(
         'Error',
         'Gagal menambahkan barang (Barcode mungkin duplikat).',
+        isError: true,
       );
     }
   }
@@ -300,7 +316,7 @@ class ProductController extends GetxController {
       await fetchProducts();
     } catch (e) {
       _logger.e("Error updating product", error: e);
-      Get.snackbar('Error', 'Gagal memperbarui barang.');
+      SnackbarHelper.show('Error', 'Gagal memperbarui barang.', isError: true);
     }
   }
 
@@ -312,13 +328,13 @@ class ProductController extends GetxController {
       products.removeWhere((p) => p.id == id);
     } catch (e) {
       _logger.e("Error deleting product", error: e);
-      Get.snackbar('Error', 'Gagal menghapus barang.');
+      SnackbarHelper.show('Error', 'Gagal menghapus barang.', isError: true);
     }
   }
 
   Future<void> exportCsvTemplate(String path) async {
     try {
-      String csv = CsvHelper.generateCsvTemplate();
+      String csv = CsvService.generateTemplate('products');
       File file = File(path);
       file.parent.createSync(recursive: true);
       await file.writeAsString(csv);
@@ -339,9 +355,7 @@ class ProductController extends GetxController {
       File file = File(filePath);
       String csvString = await file.readAsString();
 
-      // Parse CSV in isolate
-      List<Map<String, dynamic>> parsedData = await compute(
-        CsvHelper.parseCsvData,
+      List<Map<String, dynamic>> parsedData = await CsvService.parseCsvData(
         csvString,
       );
 
@@ -350,94 +364,132 @@ class ProductController extends GetxController {
       }
 
       Database db = await _dbHelper.database;
+      List<Map<String, dynamic>> errorRows = [];
+      int successCount = 0;
 
-      // Upsert logic inside a transaction
       await db.transaction((txn) async {
         for (var row in parsedData) {
-          String barcode = row['barcode'].toString();
+          try {
+            String barcode = row['barcode']?.toString() ?? '';
+            if (barcode.isEmpty) {
+              row['error_message'] = 'Barcode kosong';
+              errorRows.add(row);
+              continue;
+            }
 
-          List<Map<String, Object?>> existing = await txn.query(
-            'products',
-            where: 'barcode = ?',
-            whereArgs: [barcode],
-          );
-
-          if (existing.isNotEmpty) {
-            // Update
-            await txn.update(
+            List<Map<String, Object?>> existing = await txn.query(
               'products',
-              {
-                'name': row['name'],
-                'category_id': int.tryParse(row['category_id']?.toString() ?? ''),
-                'unit_id': int.tryParse(row['unit_id']?.toString() ?? '') ?? 1,
-                'buy_price':
-                    double.tryParse(row['buy_price'].toString()) ?? 0.0,
-                'buy_price_ppn':
-                    double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
-                'sell_price':
-                    double.tryParse(row['sell_price'].toString()) ?? 0.0,
-                'stock': int.tryParse(row['stock'].toString()) ?? 0,
-              },
               where: 'barcode = ?',
               whereArgs: [barcode],
             );
-            
-            // Note: Since base unit might change, we ideally should update product_units.
-            // But to keep it simple and safe for CSV imports, we ensure base unit exists
-            int productId = existing.first['id'] as int;
-            int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
-            
-            List<Map<String, Object?>> existingUnits = await txn.query(
-              'product_units',
-              where: 'product_id = ? AND is_base = 1',
-              whereArgs: [productId],
-            );
-            if (existingUnits.isEmpty) {
-               await txn.insert('product_units', {
+
+            if (existing.isNotEmpty) {
+              await txn.update(
+                'products',
+                {
+                  'name': row['name'],
+                  'category_id': int.tryParse(
+                    row['category_id']?.toString() ?? '',
+                  ),
+                  'unit_id':
+                      int.tryParse(row['unit_id']?.toString() ?? '') ?? 1,
+                  'buy_price':
+                      double.tryParse(row['buy_price']?.toString() ?? '') ??
+                      0.0,
+                  'sell_price':
+                      double.tryParse(row['sell_price']?.toString() ?? '') ??
+                      0.0,
+                  'stock': int.tryParse(row['stock']?.toString() ?? '') ?? 0,
+                  'min_stock':
+                      int.tryParse(row['min_stock']?.toString() ?? '') ?? 0,
+                  'wholesale_qty':
+                      int.tryParse(row['wholesale_qty']?.toString() ?? '') ?? 0,
+                  'wholesale_price':
+                      double.tryParse(
+                        row['wholesale_price']?.toString() ?? '',
+                      ) ??
+                      0.0,
+                },
+                where: 'barcode = ?',
+                whereArgs: [barcode],
+              );
+
+              int productId = existing.first['id'] as int;
+              int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
+
+              List<Map<String, Object?>> existingUnits = await txn.query(
+                'product_units',
+                where: 'product_id = ? AND is_base = 1',
+                whereArgs: [productId],
+              );
+              if (existingUnits.isEmpty) {
+                await txn.insert('product_units', {
                   'product_id': productId,
                   'unit_id': unitId,
                   'is_base': 1,
                   'multiplier_to_base': 1,
-               });
+                });
+              } else {
+                await txn.update(
+                  'product_units',
+                  {'unit_id': unitId},
+                  where: 'product_id = ? AND is_base = 1',
+                  whereArgs: [productId],
+                );
+              }
             } else {
-               await txn.update('product_units', {
-                  'unit_id': unitId,
-               }, where: 'product_id = ? AND is_base = 1', whereArgs: [productId]);
-            }
-          } else {
-            // Insert
-            int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
-            int productId = await txn.insert('products', {
-              'name': row['name'],
-              'barcode': barcode,
-              'category_id': int.tryParse(row['category_id']?.toString() ?? ''),
-              'unit_id': unitId,
-              'buy_price': double.tryParse(row['buy_price'].toString()) ?? 0.0,
-              'buy_price_ppn':
-                  double.tryParse(row['buy_price_ppn'].toString()) ?? 0.0,
-              'sell_price':
-                  double.tryParse(row['sell_price'].toString()) ?? 0.0,
-              'stock': int.tryParse(row['stock'].toString()) ?? 0,
-              'min_stock': int.tryParse(row['min_stock'].toString()) ?? 0,
-            });
-            
-            // Insert base unit
-            await txn.insert('product_units', {
+              int unitId = int.tryParse(row['unit_id']?.toString() ?? '') ?? 1;
+              int productId = await txn.insert('products', {
+                'name': row['name'],
+                'barcode': barcode,
+                'category_id': int.tryParse(
+                  row['category_id']?.toString() ?? '',
+                ),
+                'unit_id': unitId,
+                'buy_price':
+                    double.tryParse(row['buy_price']?.toString() ?? '') ?? 0.0,
+                'sell_price':
+                    double.tryParse(row['sell_price']?.toString() ?? '') ?? 0.0,
+                'stock': int.tryParse(row['stock']?.toString() ?? '') ?? 0,
+                'min_stock':
+                    int.tryParse(row['min_stock']?.toString() ?? '') ?? 0,
+                'wholesale_qty':
+                    int.tryParse(row['wholesale_qty']?.toString() ?? '') ?? 0,
+                'wholesale_price':
+                    double.tryParse(row['wholesale_price']?.toString() ?? '') ??
+                    0.0,
+              });
+
+              await txn.insert('product_units', {
                 'product_id': productId,
                 'unit_id': unitId,
                 'is_base': 1,
                 'multiplier_to_base': 1,
-            });
+              });
+            }
+            successCount++;
+          } catch (e) {
+            row['error_message'] = e.toString();
+            errorRows.add(row);
           }
         }
       });
 
-      _logger.i("CSV Import successful");
-      SnackbarHelper.show(
-        'Sukses',
-        'Data barang berhasil diimpor.',
-        isError: false,
-      );
+      if (errorRows.isNotEmpty) {
+        await CsvService.saveErrorReport('products', errorRows);
+        SnackbarHelper.show(
+          'Import Selesai',
+          '$successCount berhasil. ${errorRows.length} gagal (Cek folder Documents/Kavarera/Upload Errors).',
+          isError: true,
+        );
+      } else {
+        _logger.i("CSV Import successful");
+        SnackbarHelper.show(
+          'Sukses',
+          'Data barang berhasil diimpor.',
+          isError: false,
+        );
+      }
 
       offset = 0;
       products.clear();

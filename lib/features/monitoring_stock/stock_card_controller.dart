@@ -24,6 +24,8 @@ class StockCardController extends GetxController {
       Database db = await _dbHelper.database;
       List<Map<String, dynamic>> data = await db.query(
         'products',
+        where: 'id != ?',
+        whereArgs: [-1],
         orderBy: 'name ASC',
       );
       products.assignAll(data);
@@ -59,6 +61,57 @@ class StockCardController extends GetxController {
       _logger.e("Error loading stock movements", error: e);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> rebalanceStock(int actualPhysicalStock) async {
+    if (selectedProductId.value == null) return;
+    try {
+      Database db = await _dbHelper.database;
+      
+      var productData = await db.query(
+        'products',
+        where: 'id = ?',
+        whereArgs: [selectedProductId.value],
+      );
+      
+      if (productData.isEmpty) return;
+      
+      int currentStock = productData.first['stock'] as int;
+      int diff = actualPhysicalStock - currentStock;
+      
+      if (diff == 0) {
+        return; // No change
+      }
+      
+      await db.transaction((txn) async {
+        String nowStr = DateTime.now().toIso8601String();
+        
+        // Update product stock
+        await txn.update(
+          'products',
+          {'stock': actualPhysicalStock, 'updated_at': nowStr},
+          where: 'id = ?',
+          whereArgs: [selectedProductId.value],
+        );
+        
+        // Record adjustment movement
+        await txn.insert('stock_movements', {
+          'product_id': selectedProductId.value,
+          'type': 'ADJUSTMENT',
+          'reference_id': null,
+          'qty': diff,
+          'balance_after': actualPhysicalStock,
+          'note': 'Penyesuaian Fisik (Rebalancing)',
+          'created_at': nowStr,
+        });
+      });
+      
+      // Reload products to update UI dropdown stock indicator
+      await _loadProducts();
+      await loadStockMovements();
+    } catch (e) {
+      _logger.e("Error rebalancing stock", error: e);
     }
   }
 }

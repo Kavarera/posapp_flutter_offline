@@ -114,7 +114,7 @@ class DashboardController extends GetxController {
 
       // Aset Mengendap (Stock * buy_price)
       var asetResult = await db.rawQuery(
-        "SELECT SUM(stock * buy_price) as total FROM products",
+        "SELECT SUM(stock * buy_price) as total FROM products WHERE id != -1",
       );
       totalAsetMengendap.value =
           (asetResult.first['total'] as num?)?.toDouble() ?? 0.0;

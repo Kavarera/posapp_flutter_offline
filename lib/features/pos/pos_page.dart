@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
+import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 import 'package:window_manager/window_manager.dart';
 import 'pos_controller.dart';
 
@@ -19,6 +20,70 @@ class PosPage extends StatelessWidget {
     await windowManager.setFullScreen(true);
     await windowManager.setResizable(false);
     await windowManager.setMinimizable(false);
+  }
+
+  void _showCustomItemDialog() {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '1');
+
+    Get.defaultDialog(
+      title: 'Barang Sementara',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'Nama Barang'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: priceCtrl,
+            decoration: const InputDecoration(labelText: 'Harga Satuan'),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: qtyCtrl,
+            decoration: const InputDecoration(labelText: 'Jumlah'),
+            keyboardType: TextInputType.number,
+          ),
+        ],
+      ),
+      textConfirm: 'Tambahkan',
+      textCancel: 'Batal',
+      confirmTextColor: Colors.white,
+      onConfirm: () {
+        if (nameCtrl.text.trim().isEmpty || priceCtrl.text.trim().isEmpty) {
+          SnackbarHelper.show(
+            'Validasi',
+            'Nama dan Harga wajib diisi',
+            isError: true,
+          );
+          return;
+        }
+
+        final qty = int.tryParse(qtyCtrl.text) ?? 1;
+        final price = double.tryParse(priceCtrl.text) ?? 0;
+
+        _controller.cartItems.add({
+          'product_id': -1,
+          'product_name': nameCtrl.text.trim(),
+          'unit_id': 1,
+          'unit_name': 'Pcs',
+          'qty': qty,
+          'normal_price': price,
+          'wholesale_qty': 0,
+          'wholesale_price': 0,
+          'is_wholesale_approved': false,
+          'unit_price': price,
+          'base_unit_price': price,
+          'total_price': price * qty,
+        });
+
+        Get.back();
+      },
+    );
   }
 
   @override
@@ -54,140 +119,175 @@ class PosPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Autocomplete<Map<String, dynamic>>(
-                      displayStringForOption: (option) =>
-                          '${option['barcode']} - ${option['name']} (Stok: ${option['stock']})',
-                      optionsBuilder: (textEditingValue) async {
-                        if (textEditingValue.text.isEmpty) {
-                          return const Iterable<Map<String, dynamic>>.empty();
-                        }
-                        return await _controller.searchProductsAsync(
-                          textEditingValue.text,
-                        );
-                      },
-                      onSelected: (selection) {
-                        _controller.addToCart(selection);
-                        localSearchController?.clear();
-                        localFocusNode?.requestFocus();
-                      },
-                      fieldViewBuilder:
-                          (
-                            context,
-                            textEditingController,
-                            focusNode,
-                            onFieldSubmitted,
-                          ) {
-                            localSearchController = textEditingController;
-                            localFocusNode = focusNode;
-                            return TextField(
-                              controller: textEditingController,
-                              focusNode: focusNode,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Ketik nama barang atau SKU / Scan Barcode...',
-                                prefixIcon: const Icon(
-                                  Icons.search,
-                                  color: AppColors.primary,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: AppColors.primary,
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                              onSubmitted: (value) {
-                                onFieldSubmitted();
-                              },
-                            );
-                          },
-                      optionsViewBuilder: (context, onSelected, options) {
-                        return Align(
-                          alignment: Alignment.topLeft,
-                          child: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: MediaQuery.of(context).size.width * 0.6,
-                              constraints: const BoxConstraints(maxHeight: 300),
-                              child: ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: options.length,
-                                itemBuilder: (BuildContext context, int index) {
-                                  final option = options.elementAt(index);
-                                  return Builder(
-                                    builder: (BuildContext context) {
-                                      final bool highlight =
-                                          AutocompleteHighlightedOption.of(
-                                            context,
-                                          ) ==
-                                          index;
-                                      return Container(
-                                        color: highlight
-                                            ? AppColors.primary.withOpacity(0.1)
-                                            : null,
-                                        child: InkWell(
-                                          onTap: () {
-                                            onSelected(option);
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(16.0),
-                                            decoration: BoxDecoration(
-                                              border: Border(
-                                                bottom: BorderSide(
-                                                  color: Colors.grey.shade200,
-                                                ),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    '${option['barcode']} - ${option['name']}',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'Stok: ${option['stock']}',
-                                                  style: const TextStyle(
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Autocomplete<Map<String, dynamic>>(
+                            displayStringForOption: (option) =>
+                                '${option['barcode']} - ${option['name']} (Stok: ${option['stock']})',
+                            optionsBuilder: (textEditingValue) async {
+                              if (textEditingValue.text.isEmpty) {
+                                return const Iterable<
+                                  Map<String, dynamic>
+                                >.empty();
+                              }
+                              return await _controller.searchProductsAsync(
+                                textEditingValue.text,
+                              );
+                            },
+                            onSelected: (selection) {
+                              _controller.addToCart(selection);
+                              localSearchController?.clear();
+                              localFocusNode?.requestFocus();
+                            },
+                            fieldViewBuilder:
+                                (
+                                  context,
+                                  textEditingController,
+                                  focusNode,
+                                  onFieldSubmitted,
+                                ) {
+                                  localSearchController = textEditingController;
+                                  localFocusNode = focusNode;
+                                  return TextField(
+                                    controller: textEditingController,
+                                    focusNode: focusNode,
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Ketik nama barang atau SKU / Scan Barcode...',
+                                      prefixIcon: const Icon(
+                                        Icons.search,
+                                        color: AppColors.primary,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
                                         ),
-                                      );
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.primary,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    onSubmitted: (value) {
+                                      onFieldSubmitted();
                                     },
                                   );
                                 },
-                              ),
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.5,
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 300,
+                                    ),
+                                    child: ListView.builder(
+                                      padding: EdgeInsets.zero,
+                                      itemCount: options.length,
+                                      itemBuilder: (BuildContext context, int index) {
+                                        final option = options.elementAt(index);
+                                        return Builder(
+                                          builder: (BuildContext context) {
+                                            final bool highlight =
+                                                AutocompleteHighlightedOption.of(
+                                                  context,
+                                                ) ==
+                                                index;
+                                            return Container(
+                                              color: highlight
+                                                  ? AppColors.primary
+                                                        .withOpacity(0.1)
+                                                  : null,
+                                              child: InkWell(
+                                                onTap: () {
+                                                  onSelected(option);
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(
+                                                    16.0,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    border: Border(
+                                                      bottom: BorderSide(
+                                                        color: Colors
+                                                            .grey
+                                                            .shade200,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          '${option['barcode']} - ${option['name']}',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        'Stok: ${option['stock']}',
+                                                        style: const TextStyle(
+                                                          color:
+                                                              AppColors.primary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () => _showCustomItemDialog(),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Item Sementara'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 20,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
+
                     const SizedBox(height: 24),
                     const Text(
                       'Daftar Belanjaan',
