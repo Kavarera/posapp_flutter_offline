@@ -98,21 +98,24 @@ class FinanceMonitoringController extends GetxController {
     }
   }
 
-  Future<void> processPayment({
+  Future<bool> processPayment({
     required String type, // 'payable' or 'receivable'
     required int id,
     required double amount,
-    required File attachment,
+    File? attachment,
   }) async {
     try {
-      String? savedPath = await _saveAttachment(attachment);
-      if (savedPath == null) {
-        SnackbarHelper.show(
-          'Error',
-          'Gagal menyimpan bukti pembayaran.',
-          isError: true,
-        );
-        return;
+      String? savedPath;
+      if (attachment != null) {
+        savedPath = await _saveAttachment(attachment);
+        if (savedPath == null) {
+          SnackbarHelper.show(
+            'Error',
+            'Gagal menyimpan bukti pembayaran.',
+            isError: true,
+          );
+          return false;
+        }
       }
 
       Database db = await _dbHelper.database;
@@ -183,16 +186,12 @@ class FinanceMonitoringController extends GetxController {
         }
       });
 
-      SnackbarHelper.show(
-        'Sukses',
-        'Pelunasan berhasil disimpan.',
-        isError: false,
-      );
       if (type == 'payable') {
         loadPayables();
       } else {
         loadReceivables();
       }
+      return true;
     } catch (e) {
       _logger.e("Error processing payment", error: e);
       SnackbarHelper.show(
@@ -200,6 +199,7 @@ class FinanceMonitoringController extends GetxController {
         'Gagal memproses pelunasan: $e',
         isError: true,
       );
+      return false;
     }
   }
 

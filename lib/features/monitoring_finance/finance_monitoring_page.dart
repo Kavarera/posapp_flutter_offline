@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -38,7 +39,7 @@ class FinanceMonitoringPage extends StatelessWidget {
             labelColor: AppColors.textPrimary,
             unselectedLabelColor: Colors.black,
             indicatorColor: AppColors.primary,
-            indicatorSize: TabBarIndicatorSize.tab,
+            labelPadding: EdgeInsets.symmetric(horizontal: 8),
             tabs: [
               Tab(
                 child: Center(
@@ -128,6 +129,7 @@ class FinanceMonitoringPage extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
+                    onTap: () => _showHistoryDialog(context, item, 'payable'),
                     title: Text(
                       '${item['invoice_number']} - ${item['supplier_name']}',
                     ),
@@ -231,6 +233,7 @@ class FinanceMonitoringPage extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
+                    onTap: () => _showHistoryDialog(context, item, 'receivable'),
                     title: Text(
                       '${item['transaction_number']} - ${item['customer_name'] ?? 'Pelanggan'}',
                     ),
@@ -276,6 +279,80 @@ class FinanceMonitoringPage extends StatelessWidget {
           }),
         ),
       ],
+    );
+  }
+  void _showHistoryDialog(BuildContext context, Map<String, dynamic> item, String type) async {
+    final history = await _controller.getPaymentHistory(type, item['id'] as int);
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Riwayat Pembayaran'),
+        content: SizedBox(
+          width: 500,
+          child: history.isEmpty 
+              ? const Text('Belum ada riwayat pembayaran.')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final h = history[index];
+                    final date = DateTime.parse(h['payment_date'].toString());
+                    return ListTile(
+                      leading: const Icon(Icons.payment),
+                      title: Text(_currencyFormat.format(h['amount'])),
+                      subtitle: Text(_dateFormat.format(date)),
+                      trailing: h['proof_document_path'] != null 
+                          ? IconButton(
+                              icon: const Icon(Icons.image),
+                              onPressed: () {
+                                _showProofDialog(h['proof_document_path'].toString());
+                              },
+                            )
+                          : const Text('Tanpa Bukti', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Tutup')),
+        ],
+      )
+    );
+  }
+
+  void _showProofDialog(String path) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Bukti Pembayaran'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (path.toLowerCase().endsWith('.pdf'))
+                const Text('File berupa PDF.')
+              else
+                Image.file(
+                  File(path),
+                  height: 300,
+                  fit: BoxFit.contain,
+                  errorBuilder: (c, e, s) => const Text('Gagal menampilkan gambar.'),
+                ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Buka File (Aplikasi Bawaan OS)'),
+                onPressed: () {
+                  Process.run('cmd', ['/c', 'start', '""', path]);
+                },
+              )
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Tutup')),
+        ],
+      )
     );
   }
 }

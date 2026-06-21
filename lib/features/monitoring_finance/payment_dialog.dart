@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
+import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 import 'finance_monitoring_controller.dart';
 
 class PaymentDialog extends StatefulWidget {
@@ -63,25 +64,26 @@ class _PaymentDialogState extends State<PaymentDialog> {
       );
       return;
     }
-    if (_selectedFile == null) {
-      Get.snackbar(
-        'Error',
-        'Bukti pembayaran wajib diunggah.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
-    await _controller.processPayment(
+    bool success = await _controller.processPayment(
       type: widget.type,
       id: widget.data['id'] as int,
       amount: amountPaid,
-      attachment: _selectedFile!,
+      attachment: _selectedFile,
     );
+
+    if (!mounted) return;
     setState(() => _isLoading = false);
-    Get.back();
+
+    if (success) {
+      Get.back();
+      SnackbarHelper.show(
+        'Sukses',
+        'Pelunasan berhasil disimpan.',
+        isError: false,
+      );
+    }
   }
 
   @override
