@@ -12,7 +12,9 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 class PurchaseInvoiceFormPage extends StatefulWidget {
-  const PurchaseInvoiceFormPage({super.key});
+  final PurchaseInvoice? invoiceToComplete;
+
+  const PurchaseInvoiceFormPage({super.key, this.invoiceToComplete});
 
   @override
   State<PurchaseInvoiceFormPage> createState() =>
@@ -24,11 +26,14 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
       Get.find<PurchaseInvoiceController>();
 
   final _supplierInvController = TextEditingController();
+  final _totalNominalController = TextEditingController();
   final formatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  bool get _isCompleteMode => widget.invoiceToComplete != null;
 
   String _generatedInvoiceId = '';
   DateTime _invoiceDate = DateTime.now();
@@ -53,8 +58,35 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
   }
 
   Future<void> _loadInitialData() async {
-    _generatedInvoiceId = await _controller.generateInvoiceNumber();
     _suppliers = await _controller.fetchSuppliers();
+
+    if (_isCompleteMode) {
+      _generatedInvoiceId = widget.invoiceToComplete!.invoiceNumber;
+      _supplierInvController.text =
+          widget.invoiceToComplete!.supplierInvoiceNumber ?? '';
+      _totalNominalController.text = widget.invoiceToComplete!.totalNominal
+          .toInt()
+          .toString();
+      _paymentMethod = widget.invoiceToComplete!.paymentMethod;
+      try {
+        _invoiceDate = DateTime.parse(widget.invoiceToComplete!.invoiceDate);
+      } catch (_) {}
+      try {
+        if (widget.invoiceToComplete!.dueDate != null) {
+          _dueDate = DateTime.parse(widget.invoiceToComplete!.dueDate!);
+        }
+      } catch (_) {}
+
+      try {
+        _selectedSupplier = _suppliers.firstWhere(
+          (s) => s.id == widget.invoiceToComplete!.supplierId,
+        );
+        await _onSupplierChanged(_selectedSupplier);
+      } catch (_) {}
+    } else {
+      _generatedInvoiceId = await _controller.generateInvoiceNumber();
+    }
+
     setState(() {});
   }
 
@@ -143,7 +175,7 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     }
   }
 
-  double get _totalNominal {
+  double get _itemsTotal {
     double total = 0;
     for (var d in _details) {
       total += d.totalPrice;
@@ -156,25 +188,52 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
       SnackbarHelper.show('Validasi', 'Supplier wajib dipilih', isError: true);
       return;
     }
-    if (_details.isEmpty) {
+
+    double inputNominal =
+        double.tryParse(
+          _totalNominalController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+        ) ??
+        0;
+    if (inputNominal <= 0) {
       SnackbarHelper.show(
         'Validasi',
-        'Rincian barang tidak boleh kosong',
+        'Total Nominal harus lebih dari 0',
         isError: true,
       );
       return;
     }
-    for (var d in _details) {
-      if (d.selectedProduct == null ||
-          d.selectedUnitId == null ||
-          d.qty <= 0 ||
-          d.unitPrice <= 0) {
+
+    if (_isCompleteMode && _details.isEmpty) {
+      SnackbarHelper.show(
+        'Validasi',
+        'Rincian barang tidak boleh kosong untuk melengkapi invoice',
+        isError: true,
+      );
+      return;
+    }
+
+    if (_details.isNotEmpty) {
+      if ((_itemsTotal - inputNominal).abs() > 1) {
+        // allow 1 rupiah difference for rounding
         SnackbarHelper.show(
           'Validasi',
-          'Lengkapi semua rincian barang dengan benar (Qty dan Harga Beli harus > 0)',
+          'Total rincian barang (${formatter.format(_itemsTotal)}) tidak sama dengan Total Nominal Invoice (${formatter.format(inputNominal)}). Silakan revisi rincian atau total nominal.',
           isError: true,
         );
         return;
+      }
+      for (var d in _details) {
+        if (d.selectedProduct == null ||
+            d.selectedUnitId == null ||
+            d.qty <= 0 ||
+            d.unitPrice <= 0) {
+          SnackbarHelper.show(
+            'Validasi',
+            'Lengkapi semua rincian barang dengan benar (Qty dan Harga Beli harus > 0)',
+            isError: true,
+          );
+          return;
+        }
       }
     }
 
@@ -193,24 +252,45 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     }).toList();
 
     PurchaseInvoice newInvoice = PurchaseInvoice(
+      id: _isCompleteMode ? widget.invoiceToComplete!.id : null,
       invoiceNumber: _generatedInvoiceId,
       supplierInvoiceNumber: _supplierInvController.text.trim(),
       supplierId: _selectedSupplier!.id!,
       invoiceDate: _invoiceDate.toIso8601String(),
       dueDate: _dueDate?.toIso8601String(),
       paymentMethod: _paymentMethod,
-      totalNominal: _totalNominal,
-      createdAt: DateTime.now().toIso8601String(),
+      totalNominal: inputNominal,
+      paidAmount: _isCompleteMode ? widget.invoiceToComplete!.paidAmount : 0,
+      status: _isCompleteMode
+          ? widget.invoiceToComplete!.status
+          : 'Belum Lunas',
+      createdAt: _isCompleteMode
+          ? widget.invoiceToComplete!.createdAt
+          : DateTime.now().toIso8601String(),
     );
 
-    bool success = await _controller.saveInvoice(
-      newInvoice,
-      detailsToSave,
-      _tempFilePaths,
-    );
+    bool success;
+    if (_isCompleteMode) {
+      success = await _controller.completeInvoice(
+        newInvoice,
+        inputNominal,
+        detailsToSave,
+      );
+    } else {
+      success = await _controller.saveInvoice(
+        newInvoice,
+        detailsToSave,
+        _tempFilePaths,
+      );
+    }
+
     setState(() => _isSaving = false);
     if (success) {
-      _resetForm();
+      if (_isCompleteMode) {
+        Get.back();
+      } else {
+        _resetForm();
+      }
     }
   }
 
@@ -219,9 +299,14 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Buat Invoice Pembelian',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          _isCompleteMode
+              ? 'Lengkapi Invoice Pembelian'
+              : 'Buat Invoice Pembelian',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: AppColors.primary,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -297,7 +382,7 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
                                 DropdownMenuItem(value: s, child: Text(s.name)),
                           )
                           .toList(),
-                      onChanged: _onSupplierChanged,
+                      onChanged: _isCompleteMode ? null : _onSupplierChanged,
                       dropdownColor: Colors.white,
                     ),
                     const SizedBox(height: 20),
@@ -305,13 +390,23 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
                       controller: _supplierInvController,
                       label: 'Nomor Invoice Supplier',
                       icon: Icons.receipt,
+                      readOnly: _isCompleteMode,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildModernTextField(
+                      controller: _totalNominalController,
+                      label: 'Total Nominal Invoice *',
+                      icon: Icons.attach_money,
+                      keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => _selectDate(context, false),
+                            onTap: _isCompleteMode
+                                ? null
+                                : () => _selectDate(context, false),
                             borderRadius: BorderRadius.circular(12),
                             child: InputDecorator(
                               decoration: _modernInputDecoration(
@@ -328,7 +423,9 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: InkWell(
-                            onTap: () => _selectDate(context, true),
+                            onTap: _isCompleteMode
+                                ? null
+                                : () => _selectDate(context, true),
                             borderRadius: BorderRadius.circular(12),
                             child: InputDecorator(
                               decoration: _modernInputDecoration(
@@ -470,7 +567,6 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
               ),
             ),
           ),
-
           // RIGHT PANE: Details & Summary
           Expanded(
             flex: 4,
@@ -639,7 +735,7 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              formatter.format(_totalNominal),
+                              formatter.format(_itemsTotal),
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -723,6 +819,7 @@ class _PurchaseInvoiceFormPageState extends State<PurchaseInvoiceFormPage> {
     required String label,
     required IconData icon,
     bool readOnly = false,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return TextField(
       controller: controller,

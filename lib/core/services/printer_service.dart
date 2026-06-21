@@ -43,7 +43,7 @@ class PrinterService extends GetxService {
                 // Header
                 pw.Center(
                   child: pw.Text(
-                    'KAVARERA POS',
+                    'NI',
                     style: pw.TextStyle(
                       fontWeight: pw.FontWeight.bold,
                       fontSize: 14,

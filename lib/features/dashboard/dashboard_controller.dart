@@ -55,6 +55,7 @@ class DashboardController extends GetxController {
   var totalHutangSupplier = 0.0.obs;
   var totalPiutangKonsumen = 0.0.obs;
   var totalAsetMengendap = 0.0.obs;
+  var totalInvoiceBelumLengkap = 0.obs;
 
   var isLoadingMetrics = false.obs;
   var isNominalHidden = true.obs;
@@ -113,12 +114,19 @@ class DashboardController extends GetxController {
       totalPiutangKonsumen.value =
           (piutangResult.first['total'] as num?)?.toDouble() ?? 0.0;
 
-      // Aset Mengendap (Stock * buy_price)
+      // Aset Mengendap
       var asetResult = await db.rawQuery(
         "SELECT SUM(stock * buy_price) as total FROM products WHERE id != -1",
       );
       totalAsetMengendap.value =
           (asetResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+      // Invoice Belum Lengkap
+      var incompleteResult = await db.rawQuery(
+        "SELECT COUNT(*) as total FROM purchase_invoices pi WHERE NOT EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id)",
+      );
+      totalInvoiceBelumLengkap.value =
+          (incompleteResult.first['total'] as num?)?.toInt() ?? 0;
     } catch (e) {
       _logger.e("Failed to fetch metrics", error: e);
     } finally {

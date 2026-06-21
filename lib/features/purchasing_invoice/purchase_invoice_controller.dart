@@ -40,6 +40,7 @@ class PurchaseInvoiceController extends GetxController {
   var selectedYear = Rxn<int>();
   var sortBy = 'created_at'.obs; // 'created_at', 'total_nominal', 'due_date'
   var sortAscending = false.obs;
+  var showIncompleteOnly = false.obs;
 
   // Summaries
   int get totalInvoicesCount => invoices.length;
@@ -83,11 +84,14 @@ class PurchaseInvoiceController extends GetxController {
     bool changeSupplier = false,
     bool changeMonth = false,
     bool changeYear = false,
+    bool changeIncomplete = false,
+    bool incompleteValue = false,
   }) {
     if (changeStatus) selectedStatus.value = status;
     if (changeSupplier) selectedSupplierId.value = supplierId;
     if (changeMonth) selectedMonth.value = month;
     if (changeYear) selectedYear.value = year;
+    if (changeIncomplete) showIncompleteOnly.value = incompleteValue;
     fetchInvoices();
   }
 
@@ -104,6 +108,21 @@ class PurchaseInvoiceController extends GetxController {
   void toggleSortDirection() {
     sortAscending.value = !sortAscending.value;
     fetchInvoices();
+  }
+
+  Future<int> getIncompleteInvoicesCount() async {
+    final db = await _dbHelper.database;
+    try {
+      var res = await db.rawQuery('''
+        SELECT COUNT(*) as count
+        FROM purchase_invoices pi
+        WHERE NOT EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id)
+      ''');
+      return (res.first['count'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      _logger.e("Error counting incomplete invoices", error: e);
+      return 0;
+    }
   }
 
   Future<void> fetchInvoices() async {
@@ -127,9 +146,11 @@ class PurchaseInvoiceController extends GetxController {
         );
       }
 
-      conditions.add(
-        'EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id AND pid.qty > 0)',
-      );
+      if (showIncompleteOnly.value) {
+        conditions.add(
+          'NOT EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id)',
+        );
+      }
 
       String whereClause = conditions.isNotEmpty
           ? 'WHERE ${conditions.join(' AND ')}'
@@ -267,8 +288,6 @@ class PurchaseInvoiceController extends GetxController {
     }
   }
 
-  // Returns units that can be used for the product, and their multiplier to the base unit
-  // Returns List of Map: {'unit': Unit, 'multiplier': int}
   Future<List<Map<String, dynamic>>> fetchUnitsForProduct(int productId) async {
     try {
       final db = await _dbHelper.database;
@@ -318,7 +337,6 @@ class PurchaseInvoiceController extends GetxController {
             File tempFile = File(tempPath);
             if (await tempFile.exists()) {
               String fileName = p.basename(tempPath);
-              // append timestamp to prevent filename collision
               String newFileName =
                   '${DateTime.now().millisecondsSinceEpoch}_$fileName';
               String permPath = p.join(invoicesDir, newFileName);
@@ -363,27 +381,23 @@ class PurchaseInvoiceController extends GetxController {
           );
           await txn.insert('purchase_invoice_details', newDetail.toJson());
 
-          // Calculate ratio for stock update
           double ratio = d.unitPrice / d.baseUnitPrice;
-          // Because of floating point division, we round to nearest int
           int intRatio = ratio.round();
           if (intRatio == 0) intRatio = 1;
 
           int addedStock = d.qty * intRatio;
 
-          // Update product stock
           await txn.rawUpdate(
             'UPDATE products SET stock = stock + ? WHERE id = ?',
             [addedStock, d.productId],
           );
 
-          // Add to stock_movements
           await txn.insert('stock_movements', {
             'product_id': d.productId,
             'type': 'IN',
             'reference_id': invoiceId,
             'qty': addedStock,
-            'balance_after': 0, // In real app, query current stock first
+            'balance_after': 0,
             'note': 'Pembelian ${invoice.invoiceNumber}',
             'created_at': DateTime.now().toIso8601String(),
           });
@@ -404,7 +418,84 @@ class PurchaseInvoiceController extends GetxController {
         'Invoice Pembelian berhasil disimpan',
         isError: false,
       );
-      fetchInvoices();
+      await fetchInvoices();
+      return true;
+    } catch (e) {
+      _logger.e("Error saving invoice", error: e);
+      SnackbarHelper.show('Error', 'Gagal menyimpan invoice', isError: true);
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> completeInvoice(
+    PurchaseInvoice invoice,
+    double newTotalNominal,
+    List<PurchaseInvoiceDetail> details,
+  ) async {
+    isLoading.value = true;
+    final db = await _dbHelper.database;
+    try {
+      await db.transaction((txn) async {
+        double oldTotalNominal = invoice.totalNominal;
+        double diff = newTotalNominal - oldTotalNominal;
+
+        // 1. Update Invoice Nominal
+        double paidAmount = invoice.paymentMethod == 'Tunai' ? newTotalNominal : invoice.paidAmount;
+        await txn.update(
+          'purchase_invoices',
+          {
+            'total_nominal': newTotalNominal,
+            'paid_amount': paidAmount,
+          },
+          where: 'id = ?',
+          whereArgs: [invoice.id],
+        );
+
+        // 2. Insert Details & Update Stock
+        for (var d in details) {
+          var newDetail = PurchaseInvoiceDetail(
+            invoiceId: invoice.id!,
+            productId: d.productId,
+            unitId: d.unitId,
+            qty: d.qty,
+            unitPrice: d.unitPrice,
+            totalPrice: d.totalPrice,
+            baseUnitPrice: d.baseUnitPrice,
+          );
+          await txn.insert('purchase_invoice_details', newDetail.toJson());
+
+          double ratio = d.unitPrice / d.baseUnitPrice;
+          int intRatio = ratio.round();
+          if (intRatio == 0) intRatio = 1;
+          int addedStock = d.qty * intRatio;
+
+          await txn.rawUpdate(
+            'UPDATE products SET stock = stock + ? WHERE id = ?',
+            [addedStock, d.productId],
+          );
+
+          await txn.insert('stock_movements', {
+            'product_id': d.productId,
+            'type': 'IN',
+            'reference_id': invoice.id,
+            'qty': addedStock,
+            'balance_after': 0,
+            'note': 'Pelengkapan Pembelian ${invoice.invoiceNumber}',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+
+        // 3. Update Supplier Debt if Hutang & nominal changed
+        if (invoice.paymentMethod == 'Hutang' && diff != 0) {
+          await txn.rawUpdate(
+            'UPDATE suppliers SET debt_balance = debt_balance + ? WHERE id = ?',
+            [diff, invoice.supplierId],
+          );
+        }
+      });
+      await fetchInvoices();
       return true;
     } catch (e) {
       _logger.e('Failed to save invoice', error: e);

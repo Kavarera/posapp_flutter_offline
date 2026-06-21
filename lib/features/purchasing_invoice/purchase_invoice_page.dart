@@ -170,6 +170,25 @@ class PurchaseInvoicePage extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Obx(
+            () => Row(
+              children: [
+                FilterChip(
+                  label: const Text('Tampilkan Invoice Belum Lengkap'),
+                  selected: _controller.showIncompleteOnly.value,
+                  onSelected: (val) {
+                    _controller.applyFilter(
+                      changeIncomplete: true,
+                      incompleteValue: val,
+                    );
+                  },
+                  selectedColor: AppColors.primary.withOpacity(0.2),
+                  checkmarkColor: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           // Filters Row 2
           Row(
@@ -514,6 +533,22 @@ class PurchaseInvoicePage extends StatelessWidget {
                                       color: AppColors.primary,
                                     ),
                                   ),
+                                  if (invoice.details.isEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Get.to(() => PurchaseInvoiceFormPage(
+                                          invoiceToComplete: invoice,
+                                        ));
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.error,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      child: const Text('Lengkapi Data', style: TextStyle(fontSize: 12, color: Colors.white)),
+                                    )
+                                  ]
                                 ],
                               ),
                             ),

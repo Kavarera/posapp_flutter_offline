@@ -47,16 +47,23 @@ class _DashboardContentState extends State<DashboardContent> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              Obx(() => IconButton(
-                icon: Icon(
-                  _controller.isNominalHidden.value ? Icons.visibility_off : Icons.visibility,
-                  color: AppColors.textSecondary,
+              Obx(
+                () => IconButton(
+                  icon: Icon(
+                    _controller.isNominalHidden.value
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () {
+                    _controller.isNominalHidden.value =
+                        !_controller.isNominalHidden.value;
+                  },
+                  tooltip: _controller.isNominalHidden.value
+                      ? 'Tampilkan Nominal'
+                      : 'Sembunyikan Nominal',
                 ),
-                onPressed: () {
-                  _controller.isNominalHidden.value = !_controller.isNominalHidden.value;
-                },
-                tooltip: _controller.isNominalHidden.value ? 'Tampilkan Nominal' : 'Sembunyikan Nominal',
-              )),
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -69,7 +76,7 @@ class _DashboardContentState extends State<DashboardContent> {
               );
             }
             return GridView.count(
-              crossAxisCount: 3,
+              crossAxisCount: 6,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
               shrinkWrap: true,
@@ -105,6 +112,12 @@ class _DashboardContentState extends State<DashboardContent> {
                   "Aset Mengendap",
                   _controller.totalAsetMengendap.value,
                   Colors.teal,
+                ),
+                _buildMetricCard(
+                  "Invoice Belum Lengkap",
+                  _controller.totalInvoiceBelumLengkap.value.toDouble(),
+                  Colors.amber.shade700,
+                  isCurrency: false,
                 ),
               ],
             );
@@ -263,7 +276,12 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildMetricCard(String title, double amount, Color color) {
+  Widget _buildMetricCard(
+    String title,
+    double amount,
+    Color color, {
+    bool isCurrency = true,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -272,7 +290,7 @@ class _DashboardContentState extends State<DashboardContent> {
         border: Border(left: BorderSide(color: color, width: 4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -291,16 +309,22 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
           ),
           const SizedBox(height: 8),
-          Obx(() => Text(
-            _controller.isNominalHidden.value ? '••••••••' : _currencyFormat.format(amount),
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+          Obx(
+            () => Text(
+              _controller.isNominalHidden.value && isCurrency
+                  ? '••••••••'
+                  : (isCurrency
+                        ? _currencyFormat.format(amount)
+                        : amount.toInt().toString()),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          )),
+          ),
         ],
       ),
     );
