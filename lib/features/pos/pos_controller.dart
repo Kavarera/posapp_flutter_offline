@@ -359,9 +359,24 @@ class POSController extends GetxController {
 
       Get.defaultDialog(
         title: "Cetak Nota",
-        middleText: "Ingin cetak nota untuk transaksi ini?",
-        textConfirm: "Ya",
-        textCancel: "Tidak",
+        content: Column(
+          children: [
+            const Text("Ingin cetak nota untuk transaksi ini?"),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.remove_red_eye),
+              label: const Text("Lihat / Preview"),
+              onPressed: () {
+                Get.put(PrinterService()).previewReceiptInOs(
+                  transaction: transactionData,
+                  details: detailsForPrint,
+                );
+              },
+            ),
+          ],
+        ),
+        textConfirm: "Cetak",
+        textCancel: "Tutup",
         confirmTextColor: Colors.white,
         onConfirm: () async {
           Get.back();
