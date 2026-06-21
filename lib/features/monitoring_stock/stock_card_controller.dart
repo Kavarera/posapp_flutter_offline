@@ -156,4 +156,46 @@ class StockCardController extends GetxController {
     }
     return null;
   }
+
+  Future<List<Map<String, dynamic>>> getOpnameBatchDetails(String createdAt) async {
+    try {
+      Database db = await _dbHelper.database;
+      var res = await db.rawQuery('''
+        SELECT sm.*, p.name, p.barcode
+        FROM stock_movements sm
+        JOIN products p ON sm.product_id = p.id
+        WHERE sm.type = 'ADJUSTMENT' AND sm.created_at = ?
+      ''', [createdAt]);
+      return res;
+    } catch (e) {
+      _logger.e("Error fetching opname batch details", error: e);
+      return [];
+    }
+  }
+
+  Future<List<String>> getDocumentPaths(Map<String, dynamic> item) async {
+    if (item['reference_id'] == null) return [];
+    try {
+      Database db = await _dbHelper.database;
+      int refId = item['reference_id'] as int;
+
+      if (item['type'] == 'IN') {
+        var res = await db.query('purchase_invoices', columns: ['document_paths'], where: 'id = ?', whereArgs: [refId]);
+        if (res.isNotEmpty && res.first['document_paths'] != null) {
+          String pathsStr = res.first['document_paths'] as String;
+          if (pathsStr.isNotEmpty) {
+            // Using regex to quickly parse a simple JSON array if it's stored as String "['path1', 'path2']"
+            // Wait, usually it's JSON. Let's just return the raw string or try to parse if it's a bracketed string.
+            // Better yet, just return the string and parse it in the UI since it's just a List<dynamic> from jsonDecode.
+            // Returning the string in a list for simplicity:
+            return [pathsStr]; // UI can jsonDecode it.
+          }
+        }
+      }
+      // sales_transactions doesn't have document_paths natively, but we return empty if none
+    } catch (e) {
+      _logger.e("Error fetching document paths", error: e);
+    }
+    return [];
+  }
 }

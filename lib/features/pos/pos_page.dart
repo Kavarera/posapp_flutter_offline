@@ -4,12 +4,15 @@ import 'package:intl/intl.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:posapp_w6zxit6s/features/auth/auth_controller.dart';
+import 'package:posapp_w6zxit6s/core/services/session_service.dart';
 import 'pos_controller.dart';
 
 class PosPage extends StatelessWidget {
   PosPage({Key? key}) : super(key: key);
 
   final POSController _controller = Get.put(POSController());
+  final AuthController _authController = Get.find<AuthController>();
   final NumberFormat _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -97,7 +100,13 @@ class PosPage extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          leading: BackButton(color: AppColors.textPrimary),
+          leading: Get.find<SessionService>().role == 'Kasir'
+              ? IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  tooltip: 'Logout',
+                  onPressed: () => _authController.logout(),
+                )
+              : const BackButton(color: AppColors.textPrimary),
           title: const Text(
             'Transaksi Kasir (POS)',
             style: TextStyle(

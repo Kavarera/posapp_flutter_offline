@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:posapp_w6zxit6s/core/theme/app_colors.dart';
+import 'dart:convert';
+import 'dart:io';
 import 'package:posapp_w6zxit6s/core/utils/snackbar_helper.dart';
 import 'stock_card_controller.dart';
 import 'stock_opname_dialog.dart';
@@ -12,25 +14,76 @@ class StockCardPage extends StatelessWidget {
   final StockCardController _controller = Get.put(StockCardController());
   final DateFormat _dateFormat = DateFormat('dd MMM yyyy HH:mm');
 
-  void _showMovementDetailDialog(Map<String, dynamic> item, Map<String, dynamic>? detail) {
+  void _showMovementDetailDialog(Map<String, dynamic> item, Map<String, dynamic>? detail, List<Map<String, dynamic>> batchDetails, List<String> docPaths) {
     Get.defaultDialog(
-      title: 'Detail Pergerakan Stok',
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Tipe: ${item['type']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text('Catatan: ${item['note']}'),
-          Text('Tanggal: ${_dateFormat.format(DateTime.parse(item['created_at']))}'),
-          Text('Perubahan Qty: ${item['qty']}'),
-          Text('Stok Setelahnya: ${item['balance_after']}'),
-          if (detail != null) ...[
-            const Divider(),
-            const Text('Referensi Dokumen:', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('No Ref: ${detail['reference_number'] ?? '-'}'),
-            Text('Pihak Terkait: ${detail['related_party'] ?? '-'}'),
-          ]
-        ],
+      title: item['type'] == 'ADJUSTMENT' ? 'Detail Opname Stok' : 'Detail Pergerakan Stok',
+      content: SizedBox(
+        width: item['type'] == 'ADJUSTMENT' ? 600 : 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tipe: ${item['type']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Tanggal: ${_dateFormat.format(DateTime.parse(item['created_at']))}'),
+            
+            if (item['type'] != 'ADJUSTMENT') ...[
+              Text('Perubahan Qty: ${item['qty']}'),
+              Text('Stok Setelahnya: ${item['balance_after']}'),
+            ],
+
+            if (detail != null) ...[
+              const Divider(),
+              const Text('Referensi Dokumen:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('No Ref: ${detail['reference_number'] ?? '-'}'),
+              Text('Pihak Terkait: ${detail['related_party'] ?? '-'}'),
+            ],
+
+            if (item['type'] == 'ADJUSTMENT' && batchDetails.isNotEmpty) ...[
+              const Divider(),
+              const Text('Daftar Penyesuaian Barang:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: batchDetails.map((bd) {
+                      int qty = bd['qty'] as int;
+                      int after = bd['balance_after'] as int;
+                      int before = after - qty;
+                      return ListTile(
+                        title: Text('${bd['barcode']} - ${bd['name']}'),
+                        subtitle: Text('Sebelum: $before  |  Sesudah: $after  |  Selisih: ${qty > 0 ? '+' : ''}$qty'),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              )
+            ],
+
+            if (item['type'] == 'IN' && docPaths.isNotEmpty) ...[
+              const Divider(),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.file_open),
+                label: const Text('Buka Dokumen Bukti (Aplikasi OS)'),
+                onPressed: () {
+                  try {
+                    List<dynamic> paths = jsonDecode(docPaths.first);
+                    if (paths.isNotEmpty) {
+                      Process.run('cmd', ['/c', 'start', '""', paths.first.toString()]);
+                    }
+                  } catch (e) {
+                    // Try parsing as raw string if not json
+                    Process.run('cmd', ['/c', 'start', '""', docPaths.first]);
+                  }
+                },
+              )
+            ],
+            if (item['type'] == 'IN' && docPaths.isEmpty) ...[
+              const Divider(),
+              const Text('Tidak ada lampiran dokumen pada transaksi ini.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+            ]
+          ],
+        ),
       ),
       textConfirm: 'Tutup',
       confirmTextColor: Colors.white,
@@ -182,7 +235,15 @@ class StockCardPage extends StatelessWidget {
                     return ListTile(
                       onTap: () async {
                         final detail = await _controller.getMovementDetail(item);
-                        _showMovementDetailDialog(item, detail);
+                        List<Map<String, dynamic>> batchDetails = [];
+                        if (isAdjustment) {
+                          batchDetails = await _controller.getOpnameBatchDetails(item['created_at']);
+                        }
+                        List<String> docPaths = [];
+                        if (isIn) {
+                          docPaths = await _controller.getDocumentPaths(item);
+                        }
+                        _showMovementDetailDialog(item, detail, batchDetails, docPaths);
                       },
                       leading: CircleAvatar(
                         backgroundColor: isAdjustment

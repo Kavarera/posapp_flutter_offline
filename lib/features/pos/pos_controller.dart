@@ -350,7 +350,7 @@ class POSController extends GetxController {
         'transaction_date': DateTime.now().toIso8601String(),
         'total_nominal': totalNominal,
         'payment_method': paymentMethod.value,
-        'paid_amount': paymentMethod.value == 'Tunai' ? totalNominal : 0.0,
+        'paid_amount': paymentMethod.value == 'Tunai' ? amountPaid.value : 0.0,
       };
       List<Map<String, dynamic>> detailsForPrint = List.from(cartItems);
 
