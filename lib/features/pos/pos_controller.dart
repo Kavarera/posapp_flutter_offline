@@ -100,7 +100,8 @@ class POSController extends GetxController {
         'wholesale_price': (product['wholesale_price'] ?? 0).toDouble(),
         'is_wholesale_approved': false,
         'unit_price': product['sell_price'],
-        'base_unit_price': product['buy_price'], // Storing HPP for profit calculation
+        'base_unit_price':
+            product['buy_price'], // Storing HPP for profit calculation
         'total_price': product['sell_price'],
       });
       // Check if wholesale applies at qty = 1
@@ -114,12 +115,13 @@ class POSController extends GetxController {
     } else {
       var item = cartItems[index];
       int wQty = item['wholesale_qty'] ?? 0;
-      
+
       if (wQty > 0 && qty >= wQty && item['is_wholesale_approved'] == false) {
         // Prompt dialog
         Get.defaultDialog(
           title: "Harga Grosir",
-          middleText: "Kuantitas mencapai minimum grosir ($wQty). Gunakan harga grosir?",
+          middleText:
+              "Kuantitas mencapai minimum grosir ($wQty). Gunakan harga grosir?",
           textConfirm: "Ya",
           textCancel: "Tidak",
           confirmTextColor: Colors.white,
@@ -129,7 +131,7 @@ class POSController extends GetxController {
           },
           onCancel: () {
             _applyQtyChange(index, qty, false);
-          }
+          },
         );
       } else {
         bool isApproved = item['is_wholesale_approved'] ?? false;
@@ -143,26 +145,26 @@ class POSController extends GetxController {
   }
 
   void _applyQtyChange(int index, int qty, bool isWholesaleApproved) {
-      var item = cartItems[index];
-      int wQty = item['wholesale_qty'] ?? 0;
-      double wPrice = (item['wholesale_price'] ?? 0).toDouble();
-      double nPrice = (item['normal_price'] ?? item['unit_price']).toDouble();
+    var item = cartItems[index];
+    int wQty = item['wholesale_qty'] ?? 0;
+    double wPrice = (item['wholesale_price'] ?? 0).toDouble();
+    double nPrice = (item['normal_price'] ?? item['unit_price']).toDouble();
 
-      double totalPrice = 0;
-      if (wQty > 0 && isWholesaleApproved && qty >= wQty) {
-        int grosirCount = (qty ~/ wQty) * wQty;
-        int normalCount = qty % wQty;
-        totalPrice = (grosirCount * wPrice) + (normalCount * nPrice);
-      } else {
-        totalPrice = qty * nPrice;
-      }
+    double totalPrice = 0;
+    if (wQty > 0 && isWholesaleApproved && qty >= wQty) {
+      int grosirCount = (qty ~/ wQty) * wQty;
+      int normalCount = qty % wQty;
+      totalPrice = (grosirCount * wPrice) + (normalCount * nPrice);
+    } else {
+      totalPrice = qty * nPrice;
+    }
 
-      cartItems[index] = {
-        ...item,
-        'qty': qty,
-        'is_wholesale_approved': isWholesaleApproved,
-        'total_price': totalPrice,
-      };
+    cartItems[index] = {
+      ...item,
+      'qty': qty,
+      'is_wholesale_approved': isWholesaleApproved,
+      'total_price': totalPrice,
+    };
   }
 
   void removeCartItem(int index) {
@@ -185,7 +187,9 @@ class POSController extends GetxController {
     }
 
     if (paymentMethod.value == 'Hutang') {
-      var selectedCust = customers.firstWhereOrNull((c) => c['id'] == selectedCustomerId.value);
+      var selectedCust = customers.firstWhereOrNull(
+        (c) => c['id'] == selectedCustomerId.value,
+      );
       if (selectedCust == null || selectedCust['name'] == 'Pelanggan Umum') {
         SnackbarHelper.show(
           'Peringatan',
@@ -194,10 +198,11 @@ class POSController extends GetxController {
         );
         return false;
       }
-      
-      double currentHutang = (selectedCust['receivable_balance'] ?? 0).toDouble();
+
+      double currentHutang = (selectedCust['receivable_balance'] ?? 0)
+          .toDouble();
       double maxCredit = (selectedCust['max_credit'] ?? 0).toDouble();
-      
+
       if (maxCredit > 0 && (currentHutang + totalNominal) > maxCredit) {
         SnackbarHelper.show(
           'Limit Hutang Terlampaui',
@@ -217,16 +222,19 @@ class POSController extends GetxController {
       }
     } else if (paymentMethod.value == 'Digital') {
       // Pembayaran Digital
-      bool confirmed = await Get.defaultDialog<bool>(
-        title: "Konfirmasi Pembayaran Digital",
-        middleText: "Apakah pembayaran sebesar Rp ${totalNominal.toInt()} sudah diterima ke rekening Anda?",
-        textConfirm: "Sudah",
-        textCancel: "Belum",
-        confirmTextColor: Colors.white,
-        onConfirm: () => Get.back(result: true),
-        onCancel: () {},
-      ) ?? false;
-      
+      bool confirmed =
+          await Get.defaultDialog<bool>(
+            title: "Konfirmasi Pembayaran Digital",
+            middleText:
+                "Apakah pembayaran sebesar Rp ${totalNominal.toInt()} sudah diterima ke rekening Anda?",
+            textConfirm: "Sudah",
+            textCancel: "Belum",
+            confirmTextColor: Colors.white,
+            onConfirm: () => Get.back(result: true),
+            onCancel: () {},
+          ) ??
+          false;
+
       if (!confirmed) {
         return false; // Batal simpan
       }
@@ -251,7 +259,7 @@ class POSController extends GetxController {
               : null,
           'payment_method': paymentMethod.value,
           'total_nominal': totalNominal,
-          'paid_amount': actualPaid,
+          'paid_amount': amountPaid.value,
           'status': paymentMethod.value == 'Hutang' ? 'Belum Lunas' : 'Lunas',
           'created_at': nowStr,
         });
@@ -260,15 +268,16 @@ class POSController extends GetxController {
           int wQty = item['wholesale_qty'] ?? 0;
           bool isWholesaleApproved = item['is_wholesale_approved'] ?? false;
           int qty = item['qty'];
-          double nPrice = (item['normal_price'] ?? item['unit_price']).toDouble();
+          double nPrice = (item['normal_price'] ?? item['unit_price'])
+              .toDouble();
           double wPrice = (item['wholesale_price'] ?? 0).toDouble();
-          
+
           List<Map<String, dynamic>> finalRows = [];
-          
+
           if (wQty > 0 && isWholesaleApproved && qty >= wQty) {
             int grosirCount = (qty ~/ wQty) * wQty;
             int normalCount = qty % wQty;
-            
+
             finalRows.add({
               'qty': grosirCount,
               'unit_price': wPrice,
@@ -282,7 +291,7 @@ class POSController extends GetxController {
               });
             }
           } else {
-             finalRows.add({
+            finalRows.add({
               'qty': qty,
               'unit_price': nPrice,
               'total_price': qty * nPrice,
@@ -298,7 +307,9 @@ class POSController extends GetxController {
               'unit_price': row['unit_price'],
               'total_price': row['total_price'],
               'base_unit_price': item['base_unit_price'], // HPP
-              'custom_product_name': item['product_id'] == -1 ? item['product_name'] : null,
+              'custom_product_name': item['product_id'] == -1
+                  ? item['product_name']
+                  : null,
               'is_custom': item['product_id'] == -1 ? 1 : 0,
             });
           }
@@ -316,7 +327,8 @@ class POSController extends GetxController {
               'type': 'OUT',
               'reference_id': insertedId,
               'qty': item['qty'],
-              'balance_after': 0, // Should be computed but 0 for performance now
+              'balance_after':
+                  0, // Should be computed but 0 for performance now
               'note': 'Penjualan Kasir $trxNumber',
               'created_at': nowStr,
             });
