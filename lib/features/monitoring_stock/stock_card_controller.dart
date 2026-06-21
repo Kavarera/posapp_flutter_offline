@@ -9,6 +9,7 @@ class StockCardController extends GetxController {
 
   var products = <Map<String, dynamic>>[].obs;
   var selectedProductId = RxnInt();
+  var selectedTypeFilter = 'Semua'.obs;
 
   var stockMovements = <Map<String, dynamic>>[].obs;
   var isLoading = false.obs;
@@ -50,10 +51,24 @@ class StockCardController extends GetxController {
     isLoading.value = true;
     try {
       Database db = await _dbHelper.database;
+      String whereStr = 'product_id = ?';
+      List<dynamic> whereArgsList = [selectedProductId.value];
+      
+      if (selectedTypeFilter.value != 'Semua') {
+        whereStr += ' AND type = ?';
+        if (selectedTypeFilter.value == 'Masuk') {
+          whereArgsList.add('IN');
+        } else if (selectedTypeFilter.value == 'Keluar') {
+          whereArgsList.add('OUT');
+        } else if (selectedTypeFilter.value == 'Opname') {
+          whereArgsList.add('ADJUSTMENT');
+        }
+      }
+
       List<Map<String, dynamic>> data = await db.query(
         'stock_movements',
-        where: 'product_id = ?',
-        whereArgs: [selectedProductId.value],
+        where: whereStr,
+        whereArgs: whereArgsList,
         orderBy: 'created_at DESC',
       );
       stockMovements.assignAll(data);
@@ -64,54 +79,81 @@ class StockCardController extends GetxController {
     }
   }
 
-  Future<void> rebalanceStock(int actualPhysicalStock) async {
-    if (selectedProductId.value == null) return;
+  Future<bool> processStockOpname(List<Map<String, dynamic>> opnameItems) async {
+    if (opnameItems.isEmpty) return false;
     try {
       Database db = await _dbHelper.database;
-      
-      var productData = await db.query(
-        'products',
-        where: 'id = ?',
-        whereArgs: [selectedProductId.value],
-      );
-      
-      if (productData.isEmpty) return;
-      
-      int currentStock = productData.first['stock'] as int;
-      int diff = actualPhysicalStock - currentStock;
-      
-      if (diff == 0) {
-        return; // No change
-      }
       
       await db.transaction((txn) async {
         String nowStr = DateTime.now().toIso8601String();
         
-        // Update product stock
-        await txn.update(
-          'products',
-          {'stock': actualPhysicalStock, 'updated_at': nowStr},
-          where: 'id = ?',
-          whereArgs: [selectedProductId.value],
-        );
-        
-        // Record adjustment movement
-        await txn.insert('stock_movements', {
-          'product_id': selectedProductId.value,
-          'type': 'ADJUSTMENT',
-          'reference_id': null,
-          'qty': diff,
-          'balance_after': actualPhysicalStock,
-          'note': 'Penyesuaian Fisik (Rebalancing)',
-          'created_at': nowStr,
-        });
+        for (var item in opnameItems) {
+          int productId = item['product_id'] as int;
+          int actualPhysicalStock = item['actual_stock'] as int;
+          int diff = item['diff'] as int;
+          
+          if (diff == 0) continue;
+          
+          // Update product stock
+          await txn.update(
+            'products',
+            {'stock': actualPhysicalStock, 'updated_at': nowStr},
+            where: 'id = ?',
+            whereArgs: [productId],
+          );
+          
+          // Record adjustment movement
+          await txn.insert('stock_movements', {
+            'product_id': productId,
+            'type': 'ADJUSTMENT',
+            'reference_id': null,
+            'qty': diff,
+            'balance_after': actualPhysicalStock,
+            'note': 'Opname Stok Fisik',
+            'created_at': nowStr,
+          });
+        }
       });
       
       // Reload products to update UI dropdown stock indicator
       await _loadProducts();
       await loadStockMovements();
+      return true;
     } catch (e) {
-      _logger.e("Error rebalancing stock", error: e);
+      _logger.e("Error batch rebalancing stock", error: e);
+      return false;
     }
+  }
+
+  Future<Map<String, dynamic>?> getMovementDetail(Map<String, dynamic> item) async {
+    if (item['type'] == 'ADJUSTMENT' || item['reference_id'] == null) {
+      return null;
+    }
+    
+    try {
+      Database db = await _dbHelper.database;
+      int refId = item['reference_id'] as int;
+      
+      if (item['type'] == 'IN') {
+        var res = await db.rawQuery('''
+          SELECT pi.invoice_number as reference_number, s.name as related_party
+          FROM purchase_invoices pi
+          LEFT JOIN suppliers s ON pi.supplier_id = s.id
+          WHERE pi.id = ?
+        ''', [refId]);
+        if (res.isNotEmpty) return res.first;
+      } else if (item['type'] == 'OUT') {
+        var res = await db.rawQuery('''
+          SELECT st.transaction_number as reference_number, c.name as related_party
+          FROM sales_transactions st
+          LEFT JOIN customers c ON st.customer_id = c.id
+          WHERE st.id = ?
+        ''', [refId]);
+        if (res.isNotEmpty) return res.first;
+      }
+    } catch (e) {
+      _logger.e("Error fetching movement detail", error: e);
+    }
+    return null;
   }
 }
