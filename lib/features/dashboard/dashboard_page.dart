@@ -17,6 +17,20 @@ import 'package:posapp_w6zxit6s/features/user_management/user_management_page.da
 import 'package:posapp_w6zxit6s/core/constants/app_routes.dart';
 import 'package:posapp_w6zxit6s/features/dashboard/dashboard_content.dart';
 
+// Controllers
+import 'package:posapp_w6zxit6s/features/dashboard/dashboard_controller.dart';
+import 'package:posapp_w6zxit6s/features/master_supplier/supplier_controller.dart';
+import 'package:posapp_w6zxit6s/features/master_category/category_controller.dart';
+import 'package:posapp_w6zxit6s/features/master_product/product_controller.dart';
+import 'package:posapp_w6zxit6s/features/master_customer/customer_controller.dart';
+import 'package:posapp_w6zxit6s/features/master_unit/unit_controller.dart';
+import 'package:posapp_w6zxit6s/features/purchasing_invoice/purchase_invoice_controller.dart';
+// import 'package:posapp_w6zxit6s/features/purchasing_invoice/price_analysis_controller.dart';
+import 'package:posapp_w6zxit6s/features/monitoring_finance/finance_monitoring_controller.dart';
+import 'package:posapp_w6zxit6s/features/monitoring_stock/stock_card_controller.dart';
+// import 'package:posapp_w6zxit6s/features/reporting/report_controller.dart';
+import 'package:posapp_w6zxit6s/features/user_management/user_management_controller.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -62,6 +76,7 @@ class _DashboardPageState extends State<DashboardPage> {
           setState(() {
             _selectedIndex = index;
           });
+          _refreshControllerForIndex(index);
         }
       },
     ),
@@ -77,6 +92,43 @@ class _DashboardPageState extends State<DashboardPage> {
     ReportDashboardPage(),
     UserManagementPage(),
   ];
+
+  void _refreshControllerForIndex(int index) {
+    switch (index) {
+      case 0:
+        if (Get.isRegistered<DashboardController>()) Get.find<DashboardController>().fetchMetrics();
+        break;
+      case 1:
+        if (Get.isRegistered<SupplierController>()) Get.find<SupplierController>().fetchSuppliers();
+        break;
+      case 2:
+        if (Get.isRegistered<CategoryController>()) Get.find<CategoryController>().fetchCategories();
+        break;
+      case 3:
+        if (Get.isRegistered<ProductController>()) Get.find<ProductController>().fetchProducts();
+        break;
+      case 4:
+        if (Get.isRegistered<CustomerController>()) Get.find<CustomerController>().fetchCustomers();
+        break;
+      case 5:
+        if (Get.isRegistered<UnitController>()) Get.find<UnitController>().fetchUnits();
+        break;
+      case 6:
+        if (Get.isRegistered<PurchaseInvoiceController>()) Get.find<PurchaseInvoiceController>().fetchInvoices();
+        break;
+      // case 7: // Price Analysis doesn't fetch globally on init
+      case 8:
+        if (Get.isRegistered<FinanceMonitoringController>()) Get.find<FinanceMonitoringController>().loadPayables();
+        break;
+      case 9:
+        if (Get.isRegistered<StockCardController>()) Get.find<StockCardController>().loadStockMovements();
+        break;
+      // case 10: // Report doesn't auto generate on open
+      case 11:
+        if (Get.isRegistered<UserManagementController>()) Get.find<UserManagementController>().loadUsers();
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -309,6 +361,7 @@ class _DashboardPageState extends State<DashboardPage> {
             }
             _selectedIndex = index;
           });
+          _refreshControllerForIndex(index);
         },
       ),
     );
