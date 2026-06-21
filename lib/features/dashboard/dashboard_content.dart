@@ -36,13 +36,28 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Dashboard & Control Center',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Dashboard & Control Center',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Obx(() => IconButton(
+                icon: Icon(
+                  _controller.isNominalHidden.value ? Icons.visibility_off : Icons.visibility,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () {
+                  _controller.isNominalHidden.value = !_controller.isNominalHidden.value;
+                },
+                tooltip: _controller.isNominalHidden.value ? 'Tampilkan Nominal' : 'Sembunyikan Nominal',
+              )),
+            ],
           ),
           const SizedBox(height: 24),
 
@@ -276,8 +291,8 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            _currencyFormat.format(amount),
+          Obx(() => Text(
+            _controller.isNominalHidden.value ? '••••••••' : _currencyFormat.format(amount),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -285,7 +300,7 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-          ),
+          )),
         ],
       ),
     );

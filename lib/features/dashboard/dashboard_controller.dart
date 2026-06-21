@@ -57,6 +57,7 @@ class DashboardController extends GetxController {
   var totalAsetMengendap = 0.0.obs;
 
   var isLoadingMetrics = false.obs;
+  var isNominalHidden = true.obs;
 
   // Notes
   var adminNotes = <AdminNote>[].obs;
