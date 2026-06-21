@@ -14,6 +14,20 @@ import 'package:path/path.dart' as p;
 class PurchaseInvoiceController extends GetxController {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final Logger _logger = Logger();
+  final List<String> months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
 
   var invoices = <PurchaseInvoice>[].obs;
   var suppliers = <Supplier>[].obs;
@@ -22,6 +36,8 @@ class PurchaseInvoiceController extends GetxController {
   // Filter & Sort
   var selectedStatus = Rxn<String>(); // 'Lunas', 'Belum Lunas'
   var selectedSupplierId = Rxn<int>();
+  var selectedMonth = Rxn<int>();
+  var selectedYear = Rxn<int>();
   var sortBy = 'created_at'.obs; // 'created_at', 'total_nominal', 'due_date'
   var sortAscending = false.obs;
 
@@ -58,9 +74,20 @@ class PurchaseInvoiceController extends GetxController {
     }
   }
 
-  void applyFilter({String? status, int? supplierId}) {
-    selectedStatus.value = status;
-    selectedSupplierId.value = supplierId;
+  void applyFilter({
+    String? status,
+    int? supplierId,
+    int? month,
+    int? year,
+    bool changeStatus = false,
+    bool changeSupplier = false,
+    bool changeMonth = false,
+    bool changeYear = false,
+  }) {
+    if (changeStatus) selectedStatus.value = status;
+    if (changeSupplier) selectedSupplierId.value = supplierId;
+    if (changeMonth) selectedMonth.value = month;
+    if (changeYear) selectedYear.value = year;
     fetchInvoices();
   }
 
@@ -90,8 +117,19 @@ class PurchaseInvoiceController extends GetxController {
       if (selectedSupplierId.value != null) {
         conditions.add('pi.supplier_id = ${selectedSupplierId.value}');
       }
+      if (selectedMonth.value != null) {
+        String monthStr = selectedMonth.value!.toString().padLeft(2, '0');
+        conditions.add('strftime("%m", pi.invoice_date) = "$monthStr"');
+      }
+      if (selectedYear.value != null) {
+        conditions.add(
+          'strftime("%Y", pi.invoice_date) = "${selectedYear.value}"',
+        );
+      }
 
-      conditions.add('EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id AND pid.qty > 0)');
+      conditions.add(
+        'EXISTS (SELECT 1 FROM purchase_invoice_details pid WHERE pid.invoice_id = pi.id AND pid.qty > 0)',
+      );
 
       String whereClause = conditions.isNotEmpty
           ? 'WHERE ${conditions.join(' AND ')}'
@@ -126,10 +164,11 @@ class PurchaseInvoiceController extends GetxController {
         // Fetch details
         final detailMaps = await db.rawQuery(
           '''
-          SELECT d.*, p.name as product_name, u.name as unit_name
+          SELECT d.*, p.name as product_name, u.name as unit_name, pu.name as base_unit_name
           FROM purchase_invoice_details d
           LEFT JOIN products p ON d.product_id = p.id
           LEFT JOIN units u ON d.unit_id = u.id
+          LEFT JOIN units pu ON p.unit_id = pu.id
           WHERE d.invoice_id = ?
         ''',
           [invoice.id],

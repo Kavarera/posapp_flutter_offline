@@ -98,6 +98,7 @@ class PurchaseInvoiceDetail {
   // Transient fields
   final String? productName;
   final String? unitName;
+  final String? baseUnitName;
 
   PurchaseInvoiceDetail({
     this.id,
@@ -110,6 +111,7 @@ class PurchaseInvoiceDetail {
     required this.baseUnitPrice,
     this.productName,
     this.unitName,
+    this.baseUnitName,
   });
 
   factory PurchaseInvoiceDetail.fromJson(Map<String, dynamic> json) {
@@ -124,6 +126,7 @@ class PurchaseInvoiceDetail {
       baseUnitPrice: (json['base_unit_price'] as num).toDouble(),
       productName: json['product_name'] as String?,
       unitName: json['unit_name'] as String?,
+      baseUnitName: json['base_unit_name'] as String?,
     );
   }
 

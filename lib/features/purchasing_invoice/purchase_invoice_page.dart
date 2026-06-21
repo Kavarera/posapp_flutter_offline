@@ -53,12 +53,80 @@ class PurchaseInvoicePage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          // Summary
+          Obx(() {
+            final formatter = NumberFormat.currency(
+              locale: 'id_ID',
+              symbol: 'Rp ',
+              decimalDigits: 0,
+            );
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      const Text(
+                        'Jumlah Invoice',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_controller.totalInvoicesCount}',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    width: 1,
+                    height: 50,
+                    color: AppColors.primary.withOpacity(0.2),
+                  ),
+                  Column(
+                    children: [
+                      const Text(
+                        'Total Nominal',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        formatter.format(_controller.totalInvoicesAmount),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // Filters Row 1
           Row(
             children: [
               Expanded(
                 child: Obx(
                   () => DropdownButtonFormField<String?>(
-                    decoration: const InputDecoration(),
                     value: _controller.selectedStatus.value,
                     items: const [
                       DropdownMenuItem(
@@ -73,7 +141,7 @@ class PurchaseInvoicePage extends StatelessWidget {
                     ],
                     onChanged: (val) => _controller.applyFilter(
                       status: val,
-                      supplierId: _controller.selectedSupplierId.value,
+                      changeStatus: true,
                     ),
                   ),
                 ),
@@ -82,7 +150,6 @@ class PurchaseInvoicePage extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => DropdownButtonFormField<int?>(
-                    decoration: const InputDecoration(),
                     value: _controller.selectedSupplierId.value,
                     items: [
                       const DropdownMenuItem(
@@ -95,9 +162,57 @@ class PurchaseInvoicePage extends StatelessWidget {
                       ),
                     ],
                     onChanged: (val) => _controller.applyFilter(
-                      status: _controller.selectedStatus.value,
                       supplierId: val,
+                      changeSupplier: true,
                     ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Filters Row 2
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<int?>(
+                    value: _controller.selectedMonth.value,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Bulan'),
+                      ),
+                      for (int i = 0; i < 11; i++)
+                        DropdownMenuItem(
+                          value: i + 1,
+                          child: Text(_controller.months[i]),
+                        ),
+                    ],
+                    onChanged: (val) =>
+                        _controller.applyFilter(month: val, changeMonth: true),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<int?>(
+                    value: _controller.selectedYear.value,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Semua Tahun'),
+                      ),
+                      for (
+                        int i = DateTime.now().year - 5;
+                        i <= DateTime.now().year + 1;
+                        i++
+                      )
+                        DropdownMenuItem(value: i, child: Text('$i')),
+                    ],
+                    onChanged: (val) =>
+                        _controller.applyFilter(year: val, changeYear: true),
                   ),
                 ),
               ),
@@ -105,7 +220,6 @@ class PurchaseInvoicePage extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(),
                     value: _controller.sortBy.value,
                     items: const [
                       DropdownMenuItem(
@@ -454,6 +568,20 @@ class PurchaseInvoicePage extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Nominal: ${formatter.format(invoice.totalNominal)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               Flexible(
                 child: SingleChildScrollView(
@@ -502,7 +630,7 @@ class PurchaseInvoicePage extends StatelessWidget {
                         cells: [
                           DataCell(Text(d.productName ?? '-')),
                           DataCell(Text('${d.qty} ${d.unitName ?? '-'}')),
-                          DataCell(Text('$baseQty')),
+                          DataCell(Text('$baseQty ${d.baseUnitName ?? '-'}')),
                           DataCell(Text(formatter.format(d.unitPrice))),
                           DataCell(Text(formatter.format(d.totalPrice))),
                         ],

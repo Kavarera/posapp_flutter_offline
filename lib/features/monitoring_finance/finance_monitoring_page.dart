@@ -36,11 +36,32 @@ class FinanceMonitoringPage extends StatelessWidget {
           elevation: 1,
           bottom: const TabBar(
             labelColor: AppColors.textPrimary,
-            unselectedLabelColor: Colors.grey,
+            unselectedLabelColor: Colors.black,
             indicatorColor: AppColors.primary,
+            indicatorSize: TabBarIndicatorSize.tab,
             tabs: [
-              Tab(text: 'Hutang (Account Payable)'),
-              Tab(text: 'Piutang (Account Receivable)'),
+              Tab(
+                child: Center(
+                  child: Text(
+                    'Hutang (Account Payable)',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              Tab(
+                child: Center(
+                  child: Text(
+                    'Piutang (Account Receivable)',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
