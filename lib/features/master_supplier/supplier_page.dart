@@ -134,6 +134,50 @@ class _SupplierPageState extends State<SupplierPage> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (val) {
+                    _controller.searchQuery.value = val;
+                    _controller.fetchSuppliers();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Cari nama, kontak, atau alamat...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Obx(() => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _controller.sortBy.value,
+                    items: const [
+                      DropdownMenuItem(value: 'id', child: Text('Urutkan ID')),
+                      DropdownMenuItem(value: 'name', child: Text('Urutkan Abjad')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        _controller.sortBy.value = val;
+                        _controller.fetchSuppliers();
+                      }
+                    },
+                  ),
+                ),
+              )),
+            ],
+          ),
           const SizedBox(height: 24),
           Expanded(
             child: Obx(() {

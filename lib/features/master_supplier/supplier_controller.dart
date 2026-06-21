@@ -16,6 +16,9 @@ class SupplierController extends GetxController {
   var suppliers = <Supplier>[].obs;
   var isLoading = false.obs;
   var isImporting = false.obs;
+  
+  var searchQuery = ''.obs;
+  var sortBy = 'id'.obs;
 
   @override
   void onInit() {
@@ -27,7 +30,24 @@ class SupplierController extends GetxController {
     try {
       isLoading.value = true;
       Database db = await _dbHelper.database;
-      final List<Map<String, dynamic>> maps = await db.query('suppliers');
+      
+      String query = 'SELECT * FROM suppliers';
+      List<dynamic> args = [];
+      
+      if (searchQuery.value.isNotEmpty) {
+        query += ' WHERE name LIKE ? OR contact LIKE ? OR address LIKE ?';
+        args.add('%${searchQuery.value}%');
+        args.add('%${searchQuery.value}%');
+        args.add('%${searchQuery.value}%');
+      }
+      
+      if (sortBy.value == 'name') {
+        query += ' ORDER BY name ASC';
+      } else {
+        query += ' ORDER BY id ASC';
+      }
+      
+      final List<Map<String, dynamic>> maps = await db.rawQuery(query, args);
       suppliers.value = maps.map((e) => Supplier.fromJson(e)).toList();
     } catch (e) {
       _logger.e("Error fetching suppliers", error: e);
